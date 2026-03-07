@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Music Box Trajectory Generator</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=DM+Mono:wght@300;400&display=swap");
+
+:root {
+  --sky: #aaddf5;
+  --navy: #2d3170;
+  --cream: #faf8f5;
+  --orange: #c45c2a;
+  --purple: #7c3aed;
+  --panel: rgba(255,255,255,0.48);
+  --panel-border: rgba(255,255,255,0.75);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+
+body {
+  background: var(--sky);
+  font-family: "DM Mono", monospace;
+  user-select: none;
+}
+
+/* ── TOOLBAR: fixed strip across very top ── */
+#toolbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 20px;
+  background: rgba(255,255,255,0.52);
+  border-bottom: 1.5px solid rgba(255,255,255,0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 200;
+}
+
+.tb-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  border-radius: 8px; border: none;
+  background: transparent;
+  color: var(--navy);
+  font-size: 17px;
+  cursor: pointer;
+  transition: background .13s;
+}
+.tb-btn:hover:not(:disabled) { background: rgba(44,49,112,0.1); }
+.tb-btn:disabled { opacity: 0.28; cursor: default; }
+
+.tb-sep {
+  width: 1px; height: 22px;
+  background: rgba(44,49,112,0.18);
+  margin: 0 4px;
+}
+
+.tb-presets {
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(44,49,112,0.2);
+  background: rgba(255,255,255,0.7);
+  color: var(--navy);
+  font-family: "DM Mono", monospace;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background .13s, border-color .13s;
+}
+.tb-presets:hover { background: rgba(255,255,255,.96); }
+.tb-presets.open  { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+/* ── CANVAS: fills everything below toolbar ── */
+#cv {
+  position: fixed;
+  top: 48px; left: 0; right: 0; bottom: 0;
+  width: 100%;
+  height: calc(100vh - 48px);
+  display: block;
+  cursor: crosshair;
+}
+#cv.grab     { cursor: grab; }
+#cv.grabbing { cursor: grabbing; }
+
+/* ── FLOATING UI: overlaid on canvas ── */
+.float-ui {
+  position: fixed;
+  top: 48px; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Title top-left */
+.title-block {
+  position: absolute;
+  top: 18px; left: 22px;
+  pointer-events: auto;
+}
+.title-block h1 {
+  font-family: "Playfair Display", serif;
+  font-style: italic;
+  font-size: 1.75rem;
+  color: #1a1f4e;
+  line-height: 1.15;
+}
+.help-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--cream);
+  border: 1.5px solid rgba(44,49,112,0.18);
+  color: #555; font-size: 12px; cursor: pointer;
+  font-family: "Playfair Display", serif;
+  font-style: italic; font-weight: 700;
+  margin-top: 8px;
+  pointer-events: auto;
+  transition: background .18s;
+}
+.help-btn:hover { background: #e8f5fc; }
+
+/* Right sidebar */
+.sidebar {
+  position: absolute;
+  top: 14px; right: 14px; bottom: 14px;
+  width: 192px;
+  display: flex; flex-direction: column; gap: 11px;
+  pointer-events: auto;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.sidebar::-webkit-scrollbar { display: none; }
+
+.panel {
+  background: var(--panel);
+  border: 1.5px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 13px 14px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  flex-shrink: 0;
+}
+.panel h2 {
+  font-family: "Playfair Display", serif;
+  font-size: 1.15rem; color: #1a1f4e;
+  margin-bottom: 10px;
+}
+
+.tools-list { display: flex; flex-direction: column; gap: 7px; }
+.pts-label { font-size: 10px; color: #5a6a8a; margin-bottom: 2px; }
+.pts-row {
+  display: flex; align-items: center;
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(44,49,112,0.15);
+  border-radius: 8px; overflow: hidden;
+}
+.pts-btn {
+  width: 30px; height: 28px; border: none; background: transparent;
+  font-size: 17px; color: var(--navy); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .11s;
+}
+.pts-btn:hover { background: rgba(44,49,112,.1); }
+.pts-val { flex: 1; text-align: center; font-size: 12.5px; color: #1a1f4e; }
+
+.tool-btn {
+  width: 100%; padding: 6px 10px;
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(44,49,112,0.15);
+  border-radius: 8px;
+  font-family: "DM Mono", monospace; font-size: 11px;
+  color: var(--navy); cursor: pointer; text-align: left;
+  transition: background .13s;
+}
+.tool-btn:hover { background: rgba(255,255,255,.95); }
+.tool-btn.active  { background: var(--navy); color: #fff; }
+.tool-btn.running { background: #1a6a5a; color: #fff; animation: pulse .8s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+.prog-wrap { height: 3px; border-radius: 2px; background: rgba(44,49,112,.14); overflow: hidden; margin-top: 8px; }
+.prog-bar  { height: 100%; background: var(--navy); width: 0; transition: width .1s; }
+.status-txt{ font-size: 10px; color: #4a5a7a; margin-top: 5px; font-style: italic; min-height: 13px; }
+
+.leg-row { display: flex; align-items: center; gap: 7px; font-size: 10px; color: #4a5a7a; padding: 2px 0; }
+.leg-line { width: 18px; height: 2.5px; border-radius: 2px; flex-shrink: 0; }
+
+.params-list { display: flex; flex-direction: column; }
+.pr { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid rgba(44,49,112,.09); font-size: 9px; }
+.pr:last-child { border: none; }
+.pk { color: #5a7a9a; } .pv { color: #1a2a3a; }
+.pv.blu { color: #2a5a9a; } .pv.grn { color: #1a6a5a; } .pv.red { color: var(--orange); }
+
+.figures-panel { flex: 1; min-height: 100px; display: flex; flex-direction: column; }
+.figures-grid { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; flex: 1; }
+.figure-card {
+  background: rgba(255,255,255,0.8);
+  border: 1.5px solid rgba(44,49,112,.11);
+  border-radius: 7px; padding: 6px 10px;
+  cursor: pointer; font-size: 10.5px; color: #555;
+  display: flex; align-items: center; gap: 9px; flex-shrink: 0;
+  transition: border-color .18s;
+}
+.figure-card:hover { border-color: var(--navy); }
+.figure-card.active { border-color: var(--purple); }
+.figure-icon { font-size: 20px; flex-shrink: 0; }
+
+/* ── PRESETS OVERLAY ── */
+#presetsOverlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(30,40,80,0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+}
+#presetsOverlay.open { display: flex; }
+
+.presets-box {
+  background: rgba(240,246,252,0.97);
+  border: 1.5px solid rgba(255,255,255,0.9);
+  border-radius: 18px;
+  padding: 22px 24px 24px;
+  box-shadow: 0 12px 48px rgba(44,49,112,0.18);
+  width: min(640px, 92vw);
+  max-height: 82vh;
+  overflow-y: auto;
+}
+.presets-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.presets-header h3 {
+  font-family: "Playfair Display", serif;
+  font-style: italic; font-size: 1.2rem; color: #1a1f4e;
+}
+.presets-close {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(44,49,112,0.2);
+  background: rgba(255,255,255,0.8);
+  color: #555; font-size: 15px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .14s;
+  flex-shrink: 0;
+}
+.presets-close:hover { background: #fff; color: #222; }
+
+.presets-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.preset-card {
+  background: rgba(255,255,255,0.85);
+  border: 1.5px solid rgba(44,49,112,0.12);
+  border-radius: 10px;
+  padding: 10px 8px 8px;
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  transition: border-color .16s, box-shadow .16s, transform .1s;
+}
+.preset-card:hover {
+  border-color: var(--navy);
+  box-shadow: 0 4px 14px rgba(44,49,112,0.14);
+  transform: translateY(-2px);
+}
+.preset-card canvas { display: block; border-radius: 5px; }
+.preset-name { font-size: 10px; color: #4a5a7a; }
+
+/* ── HELP OVERLAY ── */
+#helpOverlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(60,60,60,0.85);
+  z-index: 400; cursor: pointer;
+}
+#helpOverlay.open { display: block; }
+.help-tip {
+  position: absolute; color: #e8e8e8;
+  font-size: 12px; font-family: "DM Mono", monospace;
+  line-height: 1.7; max-width: 175px;
+}
+.dismiss-hint {
+  position: absolute; bottom: 24px; left: 0; right: 0;
+  text-align: center; color: #aaa; font-size: 13px;
+  font-family: "Playfair Display", serif; font-style: italic;
+}
+</style>
+</head>
+<body>
+
+<!-- TOOLBAR: fixed top of screen -->
+<div id="toolbar">
+  <button class="tb-btn" id="tbUndo" title="Undo (Ctrl+Z)" disabled>↩</button>
+  <button class="tb-btn" id="tbRedo" title="Redo (Ctrl+Y)" disabled>↪</button>
+  <div class="tb-sep"></div>
+  <button class="tb-presets" id="tbPresets">presets</button>
+</div>
+
+<!-- FULL-SCREEN CANVAS: fills everything below toolbar -->
+<canvas id="cv"></canvas>
+
+<!-- FLOATING UI: title + sidebar -->
+<div class="float-ui">
+
+  <div class="title-block">
+    <h1>Music Box<br/>Trajectory<br/>Generator</h1>
+    <button class="help-btn" id="helpBtn">?</button>
+  </div>
+
+  <div class="sidebar">
+    <div class="panel">
+      <h2>Tools</h2>
+      <div class="tools-list">
+        <div class="pts-label">number of points</div>
+        <div class="pts-row">
+          <button class="pts-btn" id="btnMinus">−</button>
+          <span class="pts-val" id="ptCount">6</span>
+          <button class="pts-btn" id="btnPlus">+</button>
+        </div>
+        <button class="tool-btn" id="toolReset">↺ Reset Shape</button>
+        <button class="tool-btn" id="toolSynth">✦ Synthesize</button>
+        <button class="tool-btn" id="toolAnimate">▶ Animate</button>
+      </div>
+      <div class="prog-wrap"><div class="prog-bar" id="pb"></div></div>
+      <div class="status-txt" id="statusTxt">drag points · then synthesize</div>
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:.95rem;margin-bottom:7px">Legend</h2>
+      <div class="leg-row"><div class="leg-line" style="background:var(--navy)"></div>Target trajectory</div>
+      <div class="leg-row"><div class="leg-line" style="background:rgba(124,58,237,0.75)"></div>Q trace (linkage)</div>
+      <div class="leg-row"><div class="leg-line" style="background:var(--orange)"></div>Animated dots</div>
+    </div>
+
+    <div class="panel" id="paramsPanel" style="display:none">
+      <h2 style="font-size:.8rem;margin-bottom:6px">d = {A,Ac,B,Bc,l₁,l₂,l₃,Q,Qc}</h2>
+      <div class="params-list" id="paramsList"></div>
+    </div>
+
+    <div class="panel figures-panel">
+      <h2>Figures</h2>
+      <div class="figures-grid">
+        <div class="figure-card active" data-fig="dancer"><span class="figure-icon">🩰</span>dancer</div>
+        <div class="figure-card" data-fig="bear"><span class="figure-icon">🐻</span>bear</div>
+        <div class="figure-card" data-fig="star"><span class="figure-icon">⭐</span>star</div>
+        <div class="figure-card" data-fig="robot"><span class="figure-icon">🤖</span>robot</div>
+        <div class="figure-card" data-fig="cat"><span class="figure-icon">🐱</span>cat</div>
+        <div class="figure-card" data-fig="butterfly"><span class="figure-icon">🦋</span>butterfly</div>
+        <div class="figure-card" data-fig="crown"><span class="figure-icon">👑</span>crown</div>
+        <div class="figure-card" data-fig="bird"><span class="figure-icon">🐦</span>bird</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRESETS OVERLAY -->
+<div id="presetsOverlay">
+  <div class="presets-box">
+    <div class="presets-header">
+      <h3>Preset Trajectories</h3>
+      <button class="presets-close" id="presetsClose">✕</button>
+    </div>
+    <div class="presets-grid" id="presetsGrid"></div>
+  </div>
+</div>
+
+<!-- HELP OVERLAY -->
+<div id="helpOverlay">
+  <div class="help-tip" id="tipCircle" style="text-align:center;max-width:200px;font-size:13px">
+    Click and drag the white points<br/>to reshape your trajectory
+  </div>
+  <div class="help-tip" style="bottom:14%;left:4%">
+    Four-bar linkage<br/>preview shown here
+  </div>
+  <div class="help-tip" style="top:10%;right:210px;text-align:right">
+    Synthesize to compute<br/>the linkage mechanism
+  </div>
+  <div class="help-tip" style="top:10%;right:22px;text-align:right">
+    Pick a figure<br/>from this panel
+  </div>
+  <div class="dismiss-hint">Click anywhere to dismiss</div>
+</div>
+
+<script>
+'use strict';
+
+// ══════════════════════════════════════════════════════
+// CANVAS — fills full window below 48px toolbar
+// ══════════════════════════════════════════════════════
+const cv  = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+
+let W, H, CX, CY, R0;
+
+function setupCanvas() {
+  const tw = window.innerWidth;
+  const th = window.innerHeight - 48;
+  cv.width  = tw * dpr;
+  cv.height = th * dpr;
+  cv.style.width  = tw + 'px';
+  cv.style.height = th + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  W = tw; H = th;
+  CX = W * 0.52;
+  CY = H * 0.46;
+  R0 = Math.min(W, H) * 0.34;
+}
+
+// ══════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════
+let nodes     = [];
+let numPts    = 6;
+let dragging  = null;
+let linkage   = null;
+let animating = false;
+let animT     = 0;
+let animFrame = null;
+let splineDirty = true;
+let _splineData = null;
+let _splinePts  = [];
+
+function resetNodes() {
+  nodes = [];
+  for (let i = 0; i < numPts; i++) {
+    const a = (i / numPts) * Math.PI * 2 - Math.PI / 2;
+    nodes.push({ x: CX + R0 * Math.cos(a), y: CY + R0 * Math.sin(a) });
+  }
+  splineDirty = true;
+  _splinePts  = [];
+}
+
+// ══════════════════════════════════════════════════════
+// HERMITE SPLINE — uniform periodic, Sherman-Morrison
+// ══════════════════════════════════════════════════════
+function solveHermiteTangents(f) {
+  const n = f.length;
+  const rhs = new Float64Array(n);
+  for (let i = 0; i < n; i++)
+    rhs[i] = 3.0 * (f[(i+1)%n] - f[(i-1+n)%n]);
+
+  const gamma = -4.0;
+  const bDiag = new Float64Array(n).fill(4.0);
+  bDiag[0]   = 4.0 - gamma;
+  bDiag[n-1] = 4.0 - (1.0 / gamma);
+  const u = new Float64Array(n);
+  u[0] = gamma; u[n-1] = 1.0;
+
+  const q = thomasSolve(bDiag, 1.0, 1.0, rhs, n);
+  const z = thomasSolve(bDiag, 1.0, 1.0, u,   n);
+  const vdotq = q[0] + (1.0/gamma)*q[n-1];
+  const vdotz = z[0] + (1.0/gamma)*z[n-1];
+  const fac   = vdotq / (1.0 + vdotz);
+
+  const ks = new Float64Array(n);
+  for (let i = 0; i < n; i++) ks[i] = q[i] - fac*z[i];
+  return ks;
+}
+
+function thomasSolve(diag, lo, hi, rhs, n) {
+  const d = diag.slice(), r = Float64Array.from(rhs);
+  for (let i = 1; i < n; i++) {
+    const m = lo/d[i-1]; d[i] -= m*hi; r[i] -= m*r[i-1];
+  }
+  const x = new Float64Array(n);
+  x[n-1] = r[n-1]/d[n-1];
+  for (let i = n-2; i >= 0; i--) x[i] = (r[i] - hi*x[i+1])/d[i];
+  return x;
+}
+
+function hermQ(tau, f0, f1, a, b) {
+  return (1-tau)*f0 + tau*f1 + tau*(1-tau)*((1-tau)*a + tau*b);
+}
+
+function computeSplineData() {
+  const n  = nodes.length;
+  const px = Float64Array.from(nodes, nd => nd.x);
+  const py = Float64Array.from(nodes, nd => nd.y);
+  const kx = solveHermiteTangents(px);
+  const ky = solveHermiteTangents(py);
+  const abx = [], aby = [];
+  for (let i = 0; i < n; i++) {
+    const ip1 = (i+1)%n;
+    const dfx = px[ip1]-px[i], dfy = py[ip1]-py[i];
+    abx.push({ a: kx[i]-dfx,  b: -kx[ip1]+dfx });
+    aby.push({ a: ky[i]-dfy,  b: -ky[ip1]+dfy });
+  }
+  _splineData = { px, py, abx, aby, n };
+  splineDirty = false;
+}
+
+function evalSpline(t) {
+  if (splineDirty || !_splineData) computeSplineData();
+  const { px, py, abx, aby, n } = _splineData;
+  const ft   = ((t%1)+1)%1;
+  const segF = ft*n;
+  const i    = Math.floor(segF)%n;
+  const tau  = segF - Math.floor(segF);
+  const ip1  = (i+1)%n;
+  return {
+    x: hermQ(tau, px[i], px[ip1], abx[i].a, abx[i].b),
+    y: hermQ(tau, py[i], py[ip1], aby[i].a, aby[i].b)
+  };
+}
+
+function getCachedSplinePts(sps) {
+  sps = sps || 80;
+  if (splineDirty || !_splineData) computeSplineData();
+  if (_splinePts.length === 0) {
+    const { px, py, abx, aby, n } = _splineData;
+    _splinePts = [];
+    for (let i = 0; i < n; i++) {
+      const ip1 = (i+1)%n;
+      for (let s = 0; s < sps; s++) {
+        const tau = s/sps;
+        _splinePts.push({
+          x: hermQ(tau, px[i], px[ip1], abx[i].a, abx[i].b),
+          y: hermQ(tau, py[i], py[ip1], aby[i].a, aby[i].b)
+        });
+      }
+    }
+  }
+  return _splinePts;
+}
+
+function sampleTargetPts(N) {
+  if (splineDirty || !_splineData) computeSplineData();
+  const raw  = getCachedSplinePts(Math.ceil(N/nodes.length)+4);
+  const step = Math.max(1, Math.floor(raw.length/N));
+  const out  = [];
+  for (let i = 0; i < raw.length && out.length < N; i += step) out.push(raw[i]);
+  return out;
+}
+
+// ══════════════════════════════════════════════════════
+// FOUR-BAR KINEMATICS
+// ══════════════════════════════════════════════════════
+function fbAt(p, theta, flip) {
+  const [Acx,Acy,Bcx,Bcy,l1,l2,l3,qa,qb] = p;
+  const Ax = Acx + l1*Math.cos(theta);
+  const Ay = Acy + l1*Math.sin(theta);
+  const dx = Ax-Bcx, dy = Ay-Bcy;
+  const r  = Math.hypot(dx,dy);
+  if (r > l2+l3+1e-6 || r < Math.abs(l2-l3)-1e-6) return null;
+  const cosV  = Math.max(-1, Math.min(1, (r*r+l3*l3-l2*l2)/(2*r*l3)));
+  const alpha = Math.atan2(dy,dx);
+  const beta  = Math.acos(cosV);
+  const th4   = flip ? alpha+beta : alpha-beta;
+  const Bx    = Bcx + l3*Math.cos(th4);
+  const By    = Bcy + l3*Math.sin(th4);
+  const cpl   = Math.atan2(By-Ay, Bx-Ax);
+  return {
+    Ax, Ay, Bx, By,
+    Qx: Ax + qa*Math.cos(cpl) - qb*Math.sin(cpl),
+    Qy: Ay + qa*Math.sin(cpl) + qb*Math.cos(cpl)
+  };
+}
+
+function traceQ(p, flip, n) {
+  n = n||300;
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const s = fbAt(p, (i/n)*Math.PI*2, flip);
+    if (s) pts.push({x:s.Qx, y:s.Qy});
+  }
+  return pts;
+}
+
+// ══════════════════════════════════════════════════════
+// SYNTHESIS
+// ══════════════════════════════════════════════════════
+function objective(p, flip, target) {
+  const [,,,, l1,l2,l3] = p;
+  const maxL = Math.max(W,H)*1.5;
+  if (l1<4||l2<4||l3<4||l1>maxL||l2>maxL||l3>maxL) return 1e12;
+  const qt = traceQ(p, flip, 160);
+  if (qt.length < 15) return 1e10;
+  let sum = 0;
+  for (const tp of target) {
+    let b=Infinity;
+    for (const qp of qt) { const d=(tp.x-qp.x)**2+(tp.y-qp.y)**2; if(d<b)b=d; }
+    sum += b;
+  }
+  for (const qp of qt) {
+    let b=Infinity;
+    for (const tp of target) { const d=(qp.x-tp.x)**2+(qp.y-tp.y)**2; if(d<b)b=d; }
+    sum += b*0.5;
+  }
+  return sum / target.length;
+}
+
+async function nelderMead(f, x0, maxIter, tol, onProg) {
+  const n = x0.length;
+  let S = [x0.slice()];
+  for (let i=0;i<n;i++){const v=x0.slice();v[i]+=(Math.abs(v[i])>1e-4?v[i]*.18:6);S.push(v);}
+  let fv = S.map(v=>f(v));
+  for (let it=0;it<maxIter;it++){
+    const ord=[...Array(n+1).keys()].sort((a,b)=>fv[a]-fv[b]);
+    S=ord.map(i=>S[i]); fv=ord.map(i=>fv[i]);
+    if(onProg&&it%80===0){onProg(it/maxIter);await new Promise(r=>setTimeout(r,0));}
+    if(fv[n]-fv[0]<tol) break;
+    const c=Array(n).fill(0);
+    for(let i=0;i<n;i++)for(let j=0;j<n;j++)c[j]+=S[i][j]/n;
+    const xr=c.map((ci,j)=>ci+(ci-S[n][j])), fr=f(xr);
+    if(fr<fv[n-1]&&fr>=fv[0]){S[n]=xr;fv[n]=fr;continue;}
+    if(fr<fv[0]){const xe=c.map((ci,j)=>ci+2*(xr[j]-ci)),fe=f(xe);S[n]=fe<fr?xe:xr;fv[n]=fe<fr?fe:fr;continue;}
+    const xc=c.map((ci,j)=>ci+.5*(S[n][j]-ci)),fc=f(xc);
+    if(fc<fv[n]){S[n]=xc;fv[n]=fc;continue;}
+    for(let i=1;i<=n;i++){S[i]=S[0].map((s,j)=>s+.5*(S[i][j]-s));fv[i]=f(S[i]);}
+  }
+  return {x:S[0], f:fv[0]};
+}
+
+function buildSeeds(tx,ty,tr) {
+  const seeds = [];
+  const cfgs = [[1.5,0,-1.5,0],[0,1.5,0,-1.5],[1.1,1.1,-1.1,-1.1],[1.4,-.6,-.6,1.4],[-1.4,.6,.6,-1.4],[.7,1.6,-1.6,.7],[2.,.3,.3,-2.],[1.8,1.,-.5,-1.5],[.5,-.5,-2.,1.],[-.8,1.8,1.2,-.6]];
+  for (const [ax,ay,bx,by] of cfgs)
+    for (const sc of [.5,.7,.9])
+      seeds.push([tx+ax*tr*sc, ty+ay*tr*sc, tx+bx*tr*sc, ty+by*tr*sc, tr*.5, tr, tr*.6, tr*.25, tr*.08]);
+  return seeds;
+}
+
+async function synthesize() {
+  const btn = document.getElementById('toolSynth');
+  btn.textContent = '⟳ Optimizing…'; btn.classList.add('running');
+  setStatus('running optimizer…');
+  stopAnim(); linkage = null;
+  document.getElementById('pb').style.width = '0%';
+  _splinePts = []; draw();
+
+  const target = sampleTargetPts(80);
+  let tx=0, ty=0;
+  target.forEach(p=>{tx+=p.x;ty+=p.y;}); tx/=target.length; ty/=target.length;
+  let tr=0;
+  target.forEach(p=>tr+=Math.hypot(p.x-tx,p.y-ty)); tr/=target.length;
+
+  const seeds = buildSeeds(tx,ty,tr);
+  let best = {score:Infinity, p:null, flip:false};
+  const total = seeds.length*2; let done=0;
+
+  for (const seed of seeds) {
+    for (const flip of [false,true]) {
+      const res = await nelderMead(p=>objective(p,flip,target), seed, 1200, .2, prog=>{
+        document.getElementById('pb').style.width = ((done/total+prog/total)*100)+'%';
+      });
+      if (res.f < best.score) best = {score:res.f, p:res.x, flip};
+      done++;
+    }
+  }
+  document.getElementById('pb').style.width = '100%';
+  if (!best.p) {
+    setStatus('failed — try reshaping');
+    btn.textContent = '✦ Synthesize'; btn.classList.remove('running');
+    return;
+  }
+
+  let th0=0, bd=Infinity;
+  for (let i=0;i<720;i++){
+    const th=(i/720)*Math.PI*2, s=fbAt(best.p,th,best.flip);
+    if(!s)continue;
+    const d=(s.Qx-target[0].x)**2+(s.Qy-target[0].y)**2;
+    if(d<bd){bd=d;th0=th;}
+  }
+
+  linkage = {p:best.p, flip:best.flip, theta0:th0, score:best.score};
+  renderParams();
+  setStatus(`fit error ≈ ${Math.sqrt(Math.max(0,best.score)).toFixed(1)} px`);
+  btn.textContent = '✦ Synthesize'; btn.classList.remove('running');
+  document.getElementById('paramsPanel').style.display = 'block';
+  draw();
+}
+
+// ══════════════════════════════════════════════════════
+// DRAWING
+// ══════════════════════════════════════════════════════
+function draw() {
+  ctx.clearRect(0,0,W,H);
+  drawGrid();
+  drawTargetSpline();
+  if (linkage) { drawQTrace(); drawLinkagePreview(); }
+  if (animating) drawAnimDots();
+  drawNodes();
+}
+
+function drawGrid() {
+  const step = 52; ctx.save();
+  ctx.strokeStyle = 'rgba(100,140,180,0.12)'; ctx.lineWidth = 1;
+  for (let x=0;x<W;x+=step){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for (let y=0;y<H;y+=step){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  ctx.restore();
+}
+
+function drawTargetSpline() {
+  if (splineDirty) { _splinePts=[]; computeSplineData(); }
+  const pts = getCachedSplinePts(90);
+  if (pts.length < 2) return;
+  ctx.save();
+  // glow pass
+  ctx.strokeStyle = 'rgba(44,49,112,0.10)'; ctx.lineWidth = 10;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+  ctx.closePath(); ctx.stroke();
+  // main line
+  ctx.strokeStyle = '#2d3170'; ctx.lineWidth = 2.8;
+  ctx.shadowColor = 'rgba(44,49,112,0.18)'; ctx.shadowBlur = 8;
+  ctx.beginPath(); pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+  ctx.closePath(); ctx.stroke();
+  ctx.restore();
+}
+
+function drawQTrace() {
+  const qt = traceQ(linkage.p, linkage.flip, 350);
+  if (qt.length < 3) return;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(124,58,237,0.72)'; ctx.lineWidth = 2.6;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.shadowColor = 'rgba(124,58,237,0.22)'; ctx.shadowBlur = 6;
+  ctx.beginPath(); qt.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));
+  ctx.closePath(); ctx.stroke();
+  ctx.restore();
+}
+
+// ── Linkage preview in lower-left of canvas ──
+function drawLinkagePreview() {
+  const {p, flip, theta0} = linkage;
+  const theta = theta0 + animT * Math.PI*2;
+
+  // Build tight bounding box over entire motion
+  const allPts = traceQ(p, flip, 80);
+  const [Acx,Acy,Bcx,Bcy] = p;
+  allPts.push({x:Acx,y:Acy}, {x:Bcx,y:Bcy});
+  for (let i=0;i<8;i++){
+    const s=fbAt(p,(i/8)*Math.PI*2,flip);
+    if(s) allPts.push({x:s.Ax,y:s.Ay},{x:s.Bx,y:s.By});
+  }
+
+  const xs=allPts.map(q=>q.x), ys=allPts.map(q=>q.y);
+  const pad=14;
+  const minX=Math.min(...xs)-pad, maxX=Math.max(...xs)+pad;
+  const minY=Math.min(...ys)-pad, maxY=Math.max(...ys)+pad;
+
+  // Target box: lower-left corner, 25% wide, 30% tall
+  const bx=18, by=H*0.67, bw=W*0.23, bh=H*0.29;
+  const sc = Math.min(bw/(maxX-minX), bh/(maxY-minY)) * 0.88;
+  const ox = bx + (bw-(maxX-minX)*sc)/2 - minX*sc;
+  const oy = by + (bh-(maxY-minY)*sc)/2 - minY*sc;
+  const T  = pt => ({ x: pt.x*sc+ox, y: pt.y*sc+oy });
+
+  // Faint Q-trace ghost
+  const qt = traceQ(p, flip, 120);
+  if (qt.length > 2) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(124,58,237,0.15)'; ctx.lineWidth = 1.2;
+    ctx.setLineDash([3,3]); ctx.lineJoin = 'round';
+    ctx.beginPath();
+    qt.forEach((q,i)=>{ const t=T(q); i?ctx.lineTo(t.x,t.y):ctx.moveTo(t.x,t.y); });
+    ctx.closePath(); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+  }
+
+  // Current configuration
+  const s = fbAt(p, theta, flip);
+  if (!s) return;
+
+  const tAc=T({x:Acx,y:Acy}), tBc=T({x:Bcx,y:Bcy});
+  const tA=T({x:s.Ax,y:s.Ay}), tB=T({x:s.Bx,y:s.By}), tQ=T({x:s.Qx,y:s.Qy});
+
+  // Ground dashes
+  ctx.save();
+  ctx.strokeStyle='rgba(30,30,30,0.3)'; ctx.lineWidth=1.4; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(tAc.x-8,tAc.y+2); ctx.lineTo(tBc.x+8,tBc.y+2); ctx.stroke();
+  ctx.setLineDash([]); ctx.restore();
+
+  gndHatch(tAc.x, tAc.y);
+  gndHatch(tBc.x, tBc.y);
+
+  // Links
+  lbar(tAc, tA, '#2d3170', 2.4);  // crank
+  lbar(tA,  tB, '#1a1f4e', 3.0);  // coupler
+  lbar(tBc, tB, '#2d3170', 2.4);  // follower
+
+  // Q arm (dashed purple)
+  ctx.save();
+  ctx.strokeStyle='rgba(124,58,237,0.6)'; ctx.lineWidth=1.5; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(tA.x,tA.y); ctx.lineTo(tQ.x,tQ.y); ctx.stroke();
+  ctx.setLineDash([]); ctx.restore();
+
+  // Pins
+  [[tAc,'#c45c2a','Ac'],[tBc,'#c45c2a','Bc'],[tA,'#fff','A'],[tB,'#fff','B']].forEach(([pt,col,lbl])=>{
+    ctx.save();
+    ctx.beginPath(); ctx.arc(pt.x,pt.y,4,0,Math.PI*2);
+    ctx.fillStyle=col; ctx.fill(); ctx.strokeStyle='#333'; ctx.lineWidth=1; ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.font='italic 9px Playfair Display,serif'; ctx.fillStyle='#444';
+    ctx.fillText(lbl, pt.x+5, pt.y-3); ctx.restore();
+  });
+
+  // Q dot (purple)
+  ctx.save();
+  ctx.beginPath(); ctx.arc(tQ.x,tQ.y,4.5,0,Math.PI*2);
+  ctx.fillStyle='#7c3aed'; ctx.shadowColor='rgba(124,58,237,0.45)'; ctx.shadowBlur=7;
+  ctx.fill(); ctx.strokeStyle='#333'; ctx.lineWidth=.8; ctx.stroke(); ctx.restore();
+
+  // Label
+  ctx.save();
+  ctx.fillStyle='rgba(44,49,112,0.45)'; ctx.font='10px DM Mono,monospace';
+  ctx.fillText('Linkage', bx+4, by+bh+14); ctx.restore();
+}
+
+function lbar(p1,p2,col,lw) {
+  ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=lw; ctx.lineCap='round';
+  ctx.shadowColor=col; ctx.shadowBlur=2;
+  ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.stroke();
+  ctx.restore();
+}
+
+function gndHatch(x,y) {
+  const s=6; ctx.save();
+  ctx.strokeStyle='rgba(30,30,30,0.3)'; ctx.lineWidth=1.1;
+  ctx.beginPath(); ctx.moveTo(x-s,y+s*.6); ctx.lineTo(x+s,y+s*.6); ctx.stroke();
+  for(let i=-2;i<=1;i++){
+    ctx.beginPath(); ctx.moveTo(x+i*s*.6+s*.6,y+s*.6); ctx.lineTo(x+i*s*.6,y+s*1.3); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawAnimDots() {
+  // Orange on target spline
+  const sp = evalSpline(animT);
+  ctx.save(); ctx.beginPath(); ctx.arc(sp.x,sp.y,7,0,Math.PI*2);
+  ctx.fillStyle='#c45c2a'; ctx.shadowColor='#c45c2a'; ctx.shadowBlur=12;
+  ctx.fill(); ctx.restore();
+  // Purple Q on linkage
+  if (linkage) {
+    const s = fbAt(linkage.p, linkage.theta0+animT*Math.PI*2, linkage.flip);
+    if (s) {
+      ctx.save(); ctx.beginPath(); ctx.arc(s.Qx,s.Qy,7,0,Math.PI*2);
+      ctx.fillStyle='#7c3aed'; ctx.shadowColor='rgba(124,58,237,0.8)'; ctx.shadowBlur=14;
+      ctx.fill(); ctx.restore();
+    }
+  }
+}
+
+function drawNodes() {
+  nodes.forEach((n,i)=>{
+    ctx.save();
+    ctx.beginPath(); ctx.arc(n.x,n.y,9,0,Math.PI*2);
+    ctx.fillStyle = dragging===i ? '#aaddf5' : '#ffffff';
+    ctx.strokeStyle = '#2d3170'; ctx.lineWidth = 2;
+    ctx.shadowColor = 'rgba(44,49,112,0.15)'; ctx.shadowBlur = 5;
+    ctx.fill(); ctx.stroke(); ctx.restore();
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// PARAMS
+// ══════════════════════════════════════════════════════
+function renderParams() {
+  if (!linkage) return;
+  const [Acx,Acy,Bcx,Bcy,l1,l2,l3,qa,qb] = linkage.p;
+  const sc = 100/R0;
+  const f  = (v,d=1) => (v*sc).toFixed(d);
+  const fp = (x,y) => `(${f(x-CX)},${f(-(y-CY))})`;
+  const s0 = fbAt(linkage.p, linkage.theta0, linkage.flip);
+  document.getElementById('paramsList').innerHTML = `
+    <div class="pr"><span class="pk">A</span><span class="pv red">${s0?fp(s0.Ax,s0.Ay):'—'}</span></div>
+    <div class="pr"><span class="pk">Ac</span><span class="pv blu">${fp(Acx,Acy)}</span></div>
+    <div class="pr"><span class="pk">B</span><span class="pv red">${s0?fp(s0.Bx,s0.By):'—'}</span></div>
+    <div class="pr"><span class="pk">Bc</span><span class="pv blu">${fp(Bcx,Bcy)}</span></div>
+    <div class="pr"><span class="pk">Q</span><span class="pv grn">${s0?fp(s0.Qx,s0.Qy):'—'}</span></div>
+    <div class="pr"><span class="pk">Qc</span><span class="pv grn">(${f(qa)},${f(qb)})</span></div>
+    <div class="pr"><span class="pk">l₁</span><span class="pv">${f(l1)}</span></div>
+    <div class="pr"><span class="pk">l₂</span><span class="pv">${f(l2)}</span></div>
+    <div class="pr"><span class="pk">l₃</span><span class="pv">${f(l3)}</span></div>`;
+}
+
+function setStatus(m) { document.getElementById('statusTxt').textContent = m; }
+
+// ══════════════════════════════════════════════════════
+// ANIMATION
+// ══════════════════════════════════════════════════════
+function startAnim() {
+  animating = true;
+  document.getElementById('toolAnimate').textContent = '⏹ Stop';
+  document.getElementById('toolAnimate').classList.add('active');
+  let last = null;
+  function step(ts) {
+    if (!animating) return;
+    if (last===null) last=ts;
+    const dt = Math.min((ts-last)/1000, .05); last=ts;
+    animT = (animT + dt*.18) % 1;
+    draw();
+    animFrame = requestAnimationFrame(step);
+  }
+  animFrame = requestAnimationFrame(step);
+}
+function stopAnim() {
+  animating = false;
+  document.getElementById('toolAnimate').textContent = '▶ Animate';
+  document.getElementById('toolAnimate').classList.remove('active');
+  if (animFrame) { cancelAnimationFrame(animFrame); animFrame=null; }
+}
+
+// ══════════════════════════════════════════════════════
+// UNDO / REDO
+// ══════════════════════════════════════════════════════
+const _hist = [];
+let _histIdx = -1;
+
+function pushHistory() {
+  _hist.splice(_histIdx+1);
+  _hist.push(nodes.map(n=>({x:n.x,y:n.y})));
+  if (_hist.length > 40) _hist.shift();
+  _histIdx = _hist.length - 1;
+  updateUndoRedo();
+}
+function restoreHistory(idx) {
+  nodes  = _hist[idx].map(n=>({x:n.x,y:n.y}));
+  numPts = nodes.length;
+  document.getElementById('ptCount').textContent = numPts;
+  splineDirty=true; _splinePts=[];
+  updateUndoRedo(); draw();
+}
+function undo() { if (_histIdx > 0)               restoreHistory(--_histIdx); }
+function redo() { if (_histIdx < _hist.length-1)  restoreHistory(++_histIdx); }
+function updateUndoRedo() {
+  document.getElementById('tbUndo').disabled = _histIdx <= 0;
+  document.getElementById('tbRedo').disabled = _histIdx >= _hist.length-1;
+}
+
+document.getElementById('tbUndo').addEventListener('click', undo);
+document.getElementById('tbRedo').addEventListener('click', redo);
+window.addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key==='z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  if ((e.ctrlKey||e.metaKey) && (e.key==='y'||(e.key==='z'&&e.shiftKey))) { e.preventDefault(); redo(); }
+});
+
+// ══════════════════════════════════════════════════════
+// PRESETS
+// ══════════════════════════════════════════════════════
+const PRESETS = [
+  {name:'figure-eight', nodes:[[ 0.00,-0.55],[ 0.38,-0.22],[ 0.50, 0.20],[ 0.00, 0.10],[-0.50, 0.20],[-0.38,-0.22]]},
+  {name:'teardrop',     nodes:[[ 0.00,-0.65],[ 0.36,-0.32],[ 0.44, 0.12],[ 0.18, 0.58],[-0.18, 0.58],[-0.44, 0.12],[-0.36,-0.32]]},
+  {name:'tri-lobe',     nodes:[[ 0.00,-0.52],[ 0.44,-0.12],[ 0.32, 0.42],[-0.32, 0.42],[-0.44,-0.12]]},
+  {name:'wide loop',    nodes:[[-0.55,-0.18],[-0.20,-0.52],[ 0.20,-0.52],[ 0.55,-0.18],[ 0.40, 0.36],[ 0.00, 0.54],[-0.40, 0.36]]},
+  {name:'crescent',     nodes:[[ 0.00,-0.62],[ 0.50,-0.36],[ 0.64, 0.10],[ 0.36, 0.56],[-0.36, 0.56],[-0.64, 0.10],[-0.50,-0.36]]},
+  {name:'double loop',  nodes:[[ 0.00,-0.36],[ 0.44,-0.56],[ 0.60, 0.00],[ 0.30, 0.46],[ 0.00, 0.16],[-0.30, 0.46],[-0.60, 0.00],[-0.44,-0.56]]}
+];
+
+function renderThumb(presetNodes, size) {
+  const oc   = document.createElement('canvas');
+  const d    = window.devicePixelRatio||1;
+  oc.width   = oc.height = size*d;
+  oc.style.width = oc.style.height = size+'px';
+  const c2   = oc.getContext('2d'); c2.scale(d,d);
+  const cx=size/2, cy=size/2, r=size*0.38;
+  const toP  = ([nx,ny]) => ({x:cx+nx*r, y:cy+ny*r});
+  const pn   = presetNodes.map(toP); const nn=pn.length;
+  const px   = Float64Array.from(pn,p=>p.x), py=Float64Array.from(pn,p=>p.y);
+  const kx   = solveHermiteTangents(px), ky=solveHermiteTangents(py);
+  const abx=[], aby=[];
+  for(let i=0;i<nn;i++){
+    const ip1=(i+1)%nn, dfx=px[ip1]-px[i], dfy=py[ip1]-py[i];
+    abx.push({a:kx[i]-dfx,b:-kx[ip1]+dfx});
+    aby.push({a:ky[i]-dfy,b:-ky[ip1]+dfy});
+  }
+  const pts=[];
+  for(let i=0;i<nn;i++){
+    const ip1=(i+1)%nn;
+    for(let s=0;s<40;s++){
+      const tau=s/40;
+      pts.push({x:hermQ(tau,px[i],px[ip1],abx[i].a,abx[i].b),
+                y:hermQ(tau,py[i],py[ip1],aby[i].a,aby[i].b)});
+    }
+  }
+  c2.strokeStyle='#2d3170'; c2.lineWidth=2; c2.lineJoin='round'; c2.lineCap='round';
+  c2.shadowColor='rgba(44,49,112,0.2)'; c2.shadowBlur=3;
+  c2.beginPath(); pts.forEach((p,i)=>i?c2.lineTo(p.x,p.y):c2.moveTo(p.x,p.y));
+  c2.closePath(); c2.stroke();
+  pn.forEach(p=>{
+    c2.beginPath(); c2.arc(p.x,p.y,3,0,Math.PI*2);
+    c2.fillStyle='#fff'; c2.fill(); c2.strokeStyle='#2d3170'; c2.lineWidth=1.2; c2.stroke();
+  });
+  return oc;
+}
+
+function buildPresetsGrid() {
+  const grid = document.getElementById('presetsGrid'); grid.innerHTML='';
+  PRESETS.forEach(preset=>{
+    const card = document.createElement('div'); card.className='preset-card';
+    card.appendChild(renderThumb(preset.nodes, 152));
+    const lbl = document.createElement('div'); lbl.className='preset-name'; lbl.textContent=preset.name;
+    card.appendChild(lbl);
+    card.addEventListener('click',()=>{ applyPreset(preset); closePresets(); });
+    grid.appendChild(card);
+  });
+}
+
+function applyPreset(preset) {
+  const r = Math.min(W,H)*0.34;
+  nodes = preset.nodes.map(([nx,ny])=>({x:CX+nx*r, y:CY+ny*r}));
+  numPts = nodes.length;
+  document.getElementById('ptCount').textContent = numPts;
+  splineDirty=true; _splinePts=[];
+  linkage=null;
+  document.getElementById('paramsPanel').style.display='none';
+  pushHistory(); draw();
+}
+
+function openPresets()  {
+  buildPresetsGrid();
+  document.getElementById('presetsOverlay').classList.add('open');
+  document.getElementById('tbPresets').classList.add('open');
+}
+function closePresets() {
+  document.getElementById('presetsOverlay').classList.remove('open');
+  document.getElementById('tbPresets').classList.remove('open');
+}
+
+document.getElementById('tbPresets').addEventListener('click',()=>{
+  document.getElementById('presetsOverlay').classList.contains('open')?closePresets():openPresets();
+});
+document.getElementById('presetsClose').addEventListener('click', closePresets);
+document.getElementById('presetsOverlay').addEventListener('click', e=>{
+  if (e.target===document.getElementById('presetsOverlay')) closePresets();
+});
+
+// ══════════════════════════════════════════════════════
+// INTERACTION
+// ══════════════════════════════════════════════════════
+function getPos(e) {
+  const rect = cv.getBoundingClientRect();
+  const t    = e.touches ? e.touches[0] : e;
+  return { x: t.clientX-rect.left, y: t.clientY-rect.top };
+}
+function hitTest(pos) {
+  for (let i=0;i<nodes.length;i++)
+    if (Math.hypot(pos.x-nodes[i].x, pos.y-nodes[i].y) < 14) return i;
+  return null;
+}
+
+cv.addEventListener('mousedown', e=>{
+  const pos=getPos(e), hit=hitTest(pos);
+  if (hit!==null) { dragging=hit; cv.classList.add('grabbing'); }
+});
+cv.addEventListener('mousemove', e=>{
+  const pos=getPos(e);
+  if (dragging!==null) {
+    nodes[dragging]={x:pos.x,y:pos.y};
+    splineDirty=true; _splinePts=[];
+    if (!animating) draw();
+  } else {
+    cv.className = hitTest(pos)!==null ? 'grab' : '';
+  }
+});
+cv.addEventListener('mouseup',    ()=>{ if(dragging!==null)pushHistory(); dragging=null; cv.className=''; });
+cv.addEventListener('mouseleave', ()=>{ dragging=null; cv.className=''; });
+
+cv.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  const hit=hitTest(getPos(e)); if(hit!==null)dragging=hit;
+},{passive:false});
+cv.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  if(dragging!==null){
+    const pos=getPos(e); nodes[dragging]={x:pos.x,y:pos.y};
+    splineDirty=true; _splinePts=[];
+    if(!animating)draw();
+  }
+},{passive:false});
+cv.addEventListener('touchend', ()=>{ if(dragging!==null)pushHistory(); dragging=null; });
+
+// Sidebar
+document.getElementById('toolReset').addEventListener('click',()=>{ resetNodes(); pushHistory(); draw(); });
+document.getElementById('toolSynth').addEventListener('click', synthesize);
+document.getElementById('toolAnimate').addEventListener('click',()=> animating?stopAnim():startAnim());
+
+document.getElementById('btnPlus').addEventListener('click',()=>{
+  if(numPts>=12)return; numPts++;
+  const l=nodes[nodes.length-1], f=nodes[0];
+  nodes.push({x:(l.x+f.x)/2,y:(l.y+f.y)/2});
+  document.getElementById('ptCount').textContent=numPts;
+  splineDirty=true;_splinePts=[];pushHistory();draw();
+});
+document.getElementById('btnMinus').addEventListener('click',()=>{
+  if(numPts<=3)return; numPts--;
+  nodes.pop();
+  document.getElementById('ptCount').textContent=numPts;
+  splineDirty=true;_splinePts=[];pushHistory();draw();
+});
+
+document.querySelectorAll('.figure-card').forEach(c=>{
+  c.addEventListener('click',function(){
+    document.querySelectorAll('.figure-card').forEach(x=>x.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// Help
+document.getElementById('helpBtn').addEventListener('click',()=>{
+  const r=cv.getBoundingClientRect(), tip=document.getElementById('tipCircle');
+  tip.style.left  = (r.left + CX*(r.width/W))+'px';
+  tip.style.top   = (r.top  + CY*(r.height/H)+48)+'px';
+  tip.style.transform = 'translate(-50%,-50%)';
+  document.getElementById('helpOverlay').classList.add('open');
+});
+document.getElementById('helpOverlay').addEventListener('click',()=>{
+  document.getElementById('helpOverlay').classList.remove('open');
+});
+
+// ══════════════════════════════════════════════════════
+// INIT + RESIZE
+// ══════════════════════════════════════════════════════
+window.addEventListener('resize',()=>{
+  setupCanvas(); resetNodes(); pushHistory(); draw();
+});
+
+(function init(){
+  setupCanvas(); resetNodes(); pushHistory(); draw();
+})();
+</script>
+</body>
+</html>
