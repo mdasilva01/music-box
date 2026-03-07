@@ -101,12 +101,15 @@ def main(num_points):
     points = [(np.cos((2*np.pi*i) / num_points), np.sin((2*np.pi * i) / num_points)) for i in range(num_points)]
     og_points = points
     active_points = points
+    counter = 0
     while True:
+        counter += 1
         s = t.time()
         xs, ys = build_parametric_spline(active_points, samples_per_seg=120)
         e = t.time()
         print(f"That took {e-s} seconds.")
         plot_points(active_points, xs, ys)
+        plt.savefig(f"figs/plot_{counter}.png")
         plt.show()
         print("Current points:")
         print(f"{active_points}\n")
