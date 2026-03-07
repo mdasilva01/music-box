@@ -97,28 +97,29 @@ def plot_points(points, xs, ys):
         plt.text(x, y, f"{i+1}", fontsize=16, fontweight="bold")
     plt.axis("equal")
 
-def main(points):
+def main(num_points):
+    points = [(np.cos((2*np.pi*i) / num_points), np.sin((2*np.pi * i) / num_points)) for i in range(num_points)]
     og_points = points
     active_points = points
     while True:
-        print("Current points:")
-        print(f"{active_points}\n")
-        print("What's your desired point index?\n")
-        i = int(input()) 
-        if i == -1 or i < 1:
-            break
-        print("What's your desired x-coordinate\n")
-        x = float(input())
-        print("What's your desired y-coordinate?\n")
-        y = float(input())
-        active_points[i-1] = (x, y)
         s = t.time()
         xs, ys = build_parametric_spline(active_points, samples_per_seg=120)
         e = t.time()
         print(f"That took {e-s} seconds.")
         plot_points(active_points, xs, ys)
         plt.show()
+        print("Current points:")
+        print(f"{active_points}\n")
+        print("What's your desired point index?\n")
+        i = int(input()) 
+        if i < 1:
+            break
+        print("What's your desired x-coordinate\n")
+        x = float(input())
+        print("What's your desired y-coordinate?\n")
+        y = float(input())
+        active_points[i-1] = (x, y)
 
-points = [(1,0), (0.5,np.sqrt(3)/2), (-0.5,np.sqrt(3)/2), (-1,0), (-0.5,-np.sqrt(3)/2), (0.5,-np.sqrt(3)/2)]
-# plot_points(points)
-main(points)
+# points = [(1,0), (0.5,np.sqrt(3)/2), (-0.5,np.sqrt(3)/2), (-1,0), (-0.5,-np.sqrt(3)/2), (0.5,-np.sqrt(3)/2)]
+# plot_points(10)
+main(20)
