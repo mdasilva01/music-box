@@ -9,14 +9,11 @@
 
       :root {
         --sky: #aaddf5;
-        --sky-dark: #7ec8e3;
         --navy: #2d3170;
         --cream: #faf8f5;
         --orange: #c45c2a;
         --purple: #7c3aed;
-        --bg: #f4f2ef;
         --panel-bg: rgba(255, 255, 255, 0.45);
-        --shadow: 0 4px 24px rgba(44, 49, 112, 0.1);
       }
 
       * {
@@ -24,14 +21,12 @@
         margin: 0;
         padding: 0;
       }
-
       html,
       body {
         width: 100%;
         height: 100%;
         overflow: hidden;
       }
-
       body {
         background: var(--sky);
         font-family: "DM Mono", monospace;
@@ -53,13 +48,18 @@
         height: calc(100vh - 56px);
       }
 
-      /* Left: title + canvas area */
       .main-area {
         flex: 1;
         display: flex;
         flex-direction: column;
         gap: 12px;
         height: 100%;
+      }
+
+      .title-block {
+        display: flex;
+        align-items: center;
+        gap: 12px;
       }
 
       .title-block h1 {
@@ -77,6 +77,7 @@
         justify-content: center;
         width: 28px;
         height: 28px;
+        flex-shrink: 0;
         border-radius: 50%;
         background: var(--cream);
         border: 1.5px solid rgba(44, 49, 112, 0.18);
@@ -86,7 +87,6 @@
         font-family: "Playfair Display", serif;
         font-style: italic;
         font-weight: 700;
-        margin-top: 8px;
         transition:
           background 0.2s,
           box-shadow 0.2s;
@@ -102,7 +102,6 @@
         width: 100%;
         flex: 1;
       }
-
       canvas#trajectory {
         display: block;
         width: 100%;
@@ -110,7 +109,6 @@
         cursor: default;
       }
 
-      /* Right sidebar */
       .sidebar {
         width: 200px;
         flex-shrink: 0;
@@ -167,19 +165,12 @@
         background: var(--navy);
         color: #fff;
       }
-
-      .figures-panel {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
+      .tool-btn:disabled {
+        opacity: 0.4;
+        cursor: default;
       }
 
       .figures-panel h2 {
-        font-family: "Playfair Display", serif;
-        font-size: 1.35rem;
-        color: #1a1f4e;
-        margin-bottom: 10px;
         flex-shrink: 0;
       }
 
@@ -215,13 +206,11 @@
       .figure-card.active {
         border-color: var(--purple);
       }
-
       .figure-icon {
         font-size: 26px;
         flex-shrink: 0;
       }
 
-      /* Help overlay */
       .help-overlay {
         position: absolute;
         inset: 0;
@@ -259,11 +248,10 @@
   </head>
   <body>
     <div class="app">
-      <!-- Main UI -->
       <div class="app-inner" id="mainUI">
         <div class="main-area">
           <div class="title-block">
-            <h1>Music Box<br />Trajectory<br />Generator</h1>
+            <h1>Music Box Trajectory Generator</h1>
             <button class="help-btn" id="helpBtn">?</button>
           </div>
           <div class="canvas-wrap">
@@ -279,7 +267,26 @@
                 ✦ Drag Points
               </button>
               <button class="tool-btn" id="toolReset">↺ Reset Shape</button>
-              <button class="tool-btn" id="toolAnimate">▶ Animate</button>
+              <button class="tool-btn" id="toolAnimate">▶ Preview</button>
+              <button class="tool-btn" id="toolSubmit">✔ Submit</button>
+              <div style="display: flex; gap: 6px; margin-top: 2px">
+                <button
+                  class="tool-btn"
+                  id="toolUndo"
+                  style="flex: 1; text-align: center"
+                  disabled
+                >
+                  Undo
+                </button>
+                <button
+                  class="tool-btn"
+                  id="toolRedo"
+                  style="flex: 1; text-align: center"
+                  disabled
+                >
+                  Redo
+                </button>
+              </div>
             </div>
           </div>
           <div class="panel figures-panel">
@@ -314,9 +321,7 @@
         </div>
       </div>
 
-      <!-- Help Overlay -->
       <div class="help-overlay" id="helpOverlay">
-        <!-- Center of trajectory circle - positioned via JS -->
         <div
           class="help-tip"
           id="tipCircle"
@@ -324,13 +329,11 @@
         >
           Click and drag the white points<br />to reshape your trajectory
         </div>
-        <!-- To the right of the linkage preview -->
         <div class="help-tip" style="bottom: 12%; left: 22%">
           Four-bar linkage<br />preview shown here
         </div>
-        <!-- Above the sidebar -->
         <div class="help-tip" style="top: 8%; right: 28px; text-align: right">
-          Pick a figure &amp; use<br />tools in this panel
+          This side panel contains controls &amp; figure selection
         </div>
         <div class="dismiss-hint">Click anywhere to dismiss</div>
       </div>
@@ -340,7 +343,6 @@
       const canvas = document.getElementById("trajectory");
       const ctx = canvas.getContext("2d");
 
-      // HiDPI
       function setupCanvas() {
         const rect = canvas.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
@@ -350,15 +352,15 @@
         return { w: rect.width, h: rect.height };
       }
 
-      let W, H;
-      let trajectoryPoints = [];
-      let dragging = null;
-      let animating = false;
-      let animT = 0;
-      let animFrame = null;
-
-      const POINT_RADIUS = 9;
-      const NUM_POINTS = 6;
+      let W,
+        H,
+        trajectoryPoints = [],
+        dragging = null;
+      let animating = false,
+        animT = 0,
+        animFrame = null;
+      const POINT_RADIUS = 9,
+        NUM_POINTS = 6;
 
       function initPoints(w, h) {
         const cx = w * 0.55,
@@ -374,20 +376,18 @@
         }
       }
 
-      // Catmull-Rom spline through points
       function catmullRomPath(pts, closed = true) {
         if (pts.length < 2) return;
         const p = closed ? [...pts, pts[0], pts[1], pts[2]] : pts;
         ctx.beginPath();
         for (let i = 0; i < (closed ? pts.length : pts.length - 1); i++) {
           const p0 = p[i === 0 ? (closed ? pts.length - 1 : 0) : i - 1] || p[i];
-          const p1 = p[i];
-          const p2 = p[i + 1];
-          const p3 = p[i + 2] || p[i + 1];
-          const steps = 20;
-          for (let t = 0; t <= steps; t++) {
-            const s = t / steps;
-            const s2 = s * s,
+          const p1 = p[i],
+            p2 = p[i + 1],
+            p3 = p[i + 2] || p[i + 1];
+          for (let t = 0; t <= 20; t++) {
+            const s = t / 20,
+              s2 = s * s,
               s3 = s2 * s;
             const x =
               0.5 *
@@ -408,16 +408,15 @@
         if (closed) ctx.closePath();
       }
 
-      // Get point on catmull-rom at param t (0..1)
       function getCatmullRomPoint(pts, t) {
-        const n = pts.length;
-        const seg = t * n;
-        const i = Math.floor(seg) % n;
-        const s = seg - Math.floor(seg);
-        const p0 = pts[(i - 1 + n) % n];
-        const p1 = pts[i];
-        const p2 = pts[(i + 1) % n];
-        const p3 = pts[(i + 2) % n];
+        const n = pts.length,
+          seg = t * n,
+          i = Math.floor(seg) % n,
+          s = seg - Math.floor(seg);
+        const p0 = pts[(i - 1 + n) % n],
+          p1 = pts[i],
+          p2 = pts[(i + 1) % n],
+          p3 = pts[(i + 2) % n];
         const s2 = s * s,
           s3 = s2 * s;
         return {
@@ -436,44 +435,36 @@
         };
       }
 
-      // Four-bar linkage preview (lower-left)
       function drawLinkage(w, h) {
         const lx = w * 0.05,
-          ly = h * 0.62;
-        const lw = w * 0.28,
+          ly = h * 0.62,
+          lw = w * 0.28,
           lh = h * 0.3;
-
-        // Base joints
-        const A = { x: lx + lw * 0.12, y: ly + lh * 0.6 };
-        const D = { x: lx + lw * 0.88, y: ly + lh * 0.6 };
-
-        // Crank angle
-        const crankAngle = animT * Math.PI * 2;
+        const A = { x: lx + lw * 0.12, y: ly + lh * 0.6 },
+          D = { x: lx + lw * 0.88, y: ly + lh * 0.6 };
         const crankLen = lh * 0.38;
         const B = {
-          x: A.x + Math.cos(crankAngle) * crankLen,
-          y: A.y + Math.sin(crankAngle) * crankLen,
+          x: A.x + Math.cos(animT * Math.PI * 2) * crankLen,
+          y: A.y + Math.sin(animT * Math.PI * 2) * crankLen,
         };
-
-        // Follower: find intersection
-        const connLen = lh * 0.55;
-        const follLen = lh * 0.42;
+        const connLen = lh * 0.55,
+          follLen = lh * 0.42;
         const dx = D.x - B.x,
-          dy = D.y - B.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+          dy = D.y - B.y,
+          dist = Math.sqrt(dx * dx + dy * dy);
         let C;
         if (dist < connLen + follLen && dist > Math.abs(connLen - follLen)) {
           const a =
             (connLen * connLen - follLen * follLen + dist * dist) / (2 * dist);
           const h2 = Math.sqrt(Math.max(0, connLen * connLen - a * a));
-          const mx = B.x + (a * dx) / dist,
-            my = B.y + (a * dy) / dist;
-          C = { x: mx + (h2 * dy) / dist, y: my - (h2 * dx) / dist };
+          C = {
+            x: B.x + (a * dx) / dist + (h2 * dy) / dist,
+            y: B.y + (a * dy) / dist - (h2 * dx) / dist,
+          };
         } else {
           C = { x: B.x + connLen * 0.7, y: B.y - connLen * 0.3 };
         }
 
-        // Ground line
         ctx.strokeStyle = "rgba(30,30,30,0.35)";
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 3]);
@@ -482,31 +473,23 @@
         ctx.lineTo(D.x + 10, D.y + 2);
         ctx.stroke();
         ctx.setLineDash([]);
-
-        // Links
         ctx.lineWidth = 2.5;
         ctx.lineCap = "round";
-
-        // Crank AB
         ctx.strokeStyle = "#2d3170";
         ctx.beginPath();
         ctx.moveTo(A.x, A.y);
         ctx.lineTo(B.x, B.y);
         ctx.stroke();
-        // Coupler BC
         ctx.strokeStyle = "#1a1f4e";
         ctx.beginPath();
         ctx.moveTo(B.x, B.y);
         ctx.lineTo(C.x, C.y);
         ctx.stroke();
-        // Follower CD
         ctx.strokeStyle = "#2d3170";
         ctx.beginPath();
         ctx.moveTo(C.x, C.y);
         ctx.lineTo(D.x, D.y);
         ctx.stroke();
-
-        // Joints
         [
           [A, "#c45c2a"],
           [B, "#fff"],
@@ -521,48 +504,36 @@
           ctx.lineWidth = 1.2;
           ctx.stroke();
         });
-
-        // Label A
         ctx.fillStyle = "#333";
-        ctx.font = "italic 11px Playfair Display, serif";
+        ctx.font = "italic 11px Playfair Display,serif";
         ctx.fillText("A", A.x - 14, A.y - 4);
-
-        // Label
         ctx.fillStyle = "rgba(50,50,80,0.7)";
-        ctx.font = "18px DM Mono, monospace";
-        ctx.fillText("Live Output", lx + lw * 0.3, ly + lh + 12);
-
-        // Coupler curve trace
-        const tracePoints = [];
+        ctx.font = "18px DM Mono,monospace";
+        ctx.fillText("Output Preview", lx + lw * 0.3, ly + lh + 12);
+        const tr = [];
         for (let t2 = 0; t2 < 1; t2 += 0.01) {
-          const ang = t2 * Math.PI * 2;
-          const Bt = {
-            x: A.x + Math.cos(ang) * crankLen,
-            y: A.y + Math.sin(ang) * crankLen,
-          };
+          const ang = t2 * Math.PI * 2,
+            Bt = {
+              x: A.x + Math.cos(ang) * crankLen,
+              y: A.y + Math.sin(ang) * crankLen,
+            };
           const dx2 = D.x - Bt.x,
-            dy2 = D.y - Bt.y;
-          const dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-          if (
-            dist2 < connLen + follLen &&
-            dist2 > Math.abs(connLen - follLen)
-          ) {
+            dy2 = D.y - Bt.y,
+            d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+          if (d2 < connLen + follLen && d2 > Math.abs(connLen - follLen)) {
             const a2 =
-              (connLen * connLen - follLen * follLen + dist2 * dist2) /
-              (2 * dist2);
+              (connLen * connLen - follLen * follLen + d2 * d2) / (2 * d2);
             const h3 = Math.sqrt(Math.max(0, connLen * connLen - a2 * a2));
-            const mx2 = Bt.x + (a2 * dx2) / dist2,
-              my2 = Bt.y + (a2 * dy2) / dist2;
-            tracePoints.push({
-              x: mx2 + (h3 * dy2) / dist2,
-              y: my2 - (h3 * dx2) / dist2,
+            tr.push({
+              x: Bt.x + (a2 * dx2) / d2 + (h3 * dy2) / d2,
+              y: Bt.y + (a2 * dy2) / d2 - (h3 * dx2) / d2,
             });
           }
         }
-        if (tracePoints.length > 2) {
+        if (tr.length > 2) {
           ctx.beginPath();
-          ctx.moveTo(tracePoints[0].x, tracePoints[0].y);
-          tracePoints.forEach((p) => ctx.lineTo(p.x, p.y));
+          ctx.moveTo(tr[0].x, tr[0].y);
+          tr.forEach((p) => ctx.lineTo(p.x, p.y));
           ctx.closePath();
           ctx.strokeStyle = "rgba(124,58,237,0.28)";
           ctx.lineWidth = 1.2;
@@ -573,10 +544,7 @@
       }
 
       function draw() {
-        const { w, h } = { w: W, h: H };
-        ctx.clearRect(0, 0, w, h);
-
-        // --- Draw spline ---
+        ctx.clearRect(0, 0, W, H);
         ctx.save();
         catmullRomPath(trajectoryPoints, true);
         ctx.strokeStyle = "#2d3170";
@@ -586,8 +554,6 @@
         ctx.stroke();
         ctx.shadowBlur = 0;
         ctx.restore();
-
-        // Animating point on spline
         if (animating) {
           const pt = getCatmullRomPoint(trajectoryPoints, animT);
           ctx.beginPath();
@@ -598,8 +564,6 @@
           ctx.fill();
           ctx.shadowBlur = 0;
         }
-
-        // --- Draw control points ---
         trajectoryPoints.forEach((pt, i) => {
           ctx.beginPath();
           ctx.arc(pt.x, pt.y, POINT_RADIUS, 0, Math.PI * 2);
@@ -609,9 +573,7 @@
           ctx.fill();
           ctx.stroke();
         });
-
-        // --- Four-bar linkage preview ---
-        drawLinkage(w, h);
+        drawLinkage(W, H);
       }
 
       function animate() {
@@ -621,28 +583,40 @@
         animFrame = requestAnimationFrame(animate);
       }
 
-      // Event helpers
       function getPos(e) {
-        const rect = canvas.getBoundingClientRect();
-        const touch = e.touches ? e.touches[0] : e;
+        const rect = canvas.getBoundingClientRect(),
+          touch = e.touches ? e.touches[0] : e;
         return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
       }
-
       function hitTest(pos) {
-        for (let i = 0; i < trajectoryPoints.length; i++) {
-          const d = Math.hypot(
-            pos.x - trajectoryPoints[i].x,
-            pos.y - trajectoryPoints[i].y,
-          );
-          if (d < POINT_RADIUS + 4) return i;
-        }
+        for (let i = 0; i < trajectoryPoints.length; i++)
+          if (
+            Math.hypot(
+              pos.x - trajectoryPoints[i].x,
+              pos.y - trajectoryPoints[i].y,
+            ) <
+            POINT_RADIUS + 4
+          )
+            return i;
         return null;
       }
 
+      let undoStack = [],
+        redoStack = [];
+      function snapshot() {
+        undoStack.push(trajectoryPoints.map((p) => ({ ...p })));
+        redoStack = [];
+        updateUndoRedo();
+      }
+      function updateUndoRedo() {
+        document.getElementById("toolUndo").disabled = undoStack.length === 0;
+        document.getElementById("toolRedo").disabled = redoStack.length === 0;
+      }
+
       canvas.addEventListener("mousedown", (e) => {
-        const pos = getPos(e);
-        const hit = hitTest(pos);
+        const hit = hitTest(getPos(e));
         if (hit !== null) {
+          snapshot();
           dragging = hit;
           canvas.style.cursor = "grabbing";
         }
@@ -653,9 +627,7 @@
           trajectoryPoints[dragging].x = pos.x;
           trajectoryPoints[dragging].y = pos.y;
           draw();
-        } else {
-          canvas.style.cursor = hitTest(pos) !== null ? "grab" : "default";
-        }
+        } else canvas.style.cursor = hitTest(pos) !== null ? "grab" : "default";
       });
       canvas.addEventListener("mouseup", () => {
         dragging = null;
@@ -664,15 +636,15 @@
       canvas.addEventListener("mouseleave", () => {
         dragging = null;
       });
-
-      // Touch
       canvas.addEventListener(
         "touchstart",
         (e) => {
           e.preventDefault();
-          const pos = getPos(e);
-          const hit = hitTest(pos);
-          if (hit !== null) dragging = hit;
+          const hit = hitTest(getPos(e));
+          if (hit !== null) {
+            snapshot();
+            dragging = hit;
+          }
         },
         { passive: false },
       );
@@ -693,39 +665,45 @@
         dragging = null;
       });
 
-      // Help overlay
       document.getElementById("helpBtn").addEventListener("click", () => {
-        // Compute circle center in page coordinates
-        const canvasRect = canvas.getBoundingClientRect();
-        const appRect = document.querySelector(".app").getBoundingClientRect();
-        const cx = W * 0.55;
-        const cy = H * 0.48;
-        // Convert canvas coords to position within .app
-        const scaleX = canvasRect.width / W;
-        const scaleY = canvasRect.height / H;
-        const tipX = canvasRect.left - appRect.left + cx * scaleX;
-        const tipY = canvasRect.top - appRect.top + cy * scaleY;
+        const cr = canvas.getBoundingClientRect(),
+          ar = document.querySelector(".app").getBoundingClientRect();
         const tip = document.getElementById("tipCircle");
-        tip.style.left = tipX + "px";
-        tip.style.top = tipY + "px";
-        tip.style.transform = "translate(-50%, -50%)";
+        tip.style.left = cr.left - ar.left + W * 0.55 * (cr.width / W) + "px";
+        tip.style.top = cr.top - ar.top + H * 0.48 * (cr.height / H) + "px";
+        tip.style.transform = "translate(-50%,-50%)";
         document.getElementById("helpOverlay").classList.add("visible");
       });
-      document.getElementById("helpOverlay").addEventListener("click", () => {
-        document.getElementById("helpOverlay").classList.remove("visible");
-      });
+      document
+        .getElementById("helpOverlay")
+        .addEventListener("click", () =>
+          document.getElementById("helpOverlay").classList.remove("visible"),
+        );
 
-      // Tool buttons
       document.getElementById("toolReset").addEventListener("click", () => {
+        snapshot();
         initPoints(W, H);
         draw();
       });
-
+      document.getElementById("toolUndo").addEventListener("click", () => {
+        if (!undoStack.length) return;
+        redoStack.push(trajectoryPoints.map((p) => ({ ...p })));
+        trajectoryPoints = undoStack.pop();
+        updateUndoRedo();
+        draw();
+      });
+      document.getElementById("toolRedo").addEventListener("click", () => {
+        if (!redoStack.length) return;
+        undoStack.push(trajectoryPoints.map((p) => ({ ...p })));
+        trajectoryPoints = redoStack.pop();
+        updateUndoRedo();
+        draw();
+      });
       document
         .getElementById("toolAnimate")
         .addEventListener("click", function () {
           animating = !animating;
-          this.textContent = animating ? "⏹ Stop" : "▶ Animate";
+          this.textContent = animating ? "⏹ Stop" : "▶ Preview";
           this.classList.toggle("active", animating);
           document
             .getElementById("toolDrag")
@@ -736,18 +714,15 @@
             draw();
           }
         });
-
-      // Figures
-      document.querySelectorAll(".figure-card").forEach((card) => {
+      document.querySelectorAll(".figure-card").forEach((card) =>
         card.addEventListener("click", function () {
           document
             .querySelectorAll(".figure-card")
             .forEach((c) => c.classList.remove("active"));
           this.classList.add("active");
-        });
-      });
+        }),
+      );
 
-      // Init
       window.addEventListener("resize", () => {
         const { w, h } = setupCanvas();
         W = w;
@@ -755,8 +730,7 @@
         initPoints(w, h);
         draw();
       });
-
-      (function init() {
+      (function () {
         const { w, h } = setupCanvas();
         W = w;
         H = h;
