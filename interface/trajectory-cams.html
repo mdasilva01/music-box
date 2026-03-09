@@ -317,6 +317,12 @@ body {
         <button class="tool-btn" id="toolReset">↺ Reset Shape</button>
         <button class="tool-btn" id="toolSynth">✦ Generate Cams</button>
         <button class="tool-btn" id="toolAnimate">▶ Animate</button>
+        <div class="pts-label">trajectory speed</div>
+        <div class="pts-row">
+          <button class="pts-btn" id="btnSpeedMinus">−</button>
+          <span class="pts-val" id="speedVal">0.18x</span>
+          <button class="pts-btn" id="btnSpeedPlus">+</button>
+        </div>
       </div>
       <div class="prog-wrap"><div class="prog-bar" id="pb"></div></div>
       <div class="status-txt" id="statusTxt">drag points · then generate cams</div>
@@ -416,6 +422,7 @@ let animFrame = null;
 let splineDirty = true;
 let _splineData = null;
 let _splinePts  = [];
+let animSpeed = 0.2;
 
 function resetNodes() {
   nodes = [];
@@ -958,6 +965,19 @@ function renderParams() {
     <div class="pr"><span class="pk">samples</span><span class="pv">${camSystem.n}</span></div>
   `;
 }
+function updateSpeedLabel() {
+  document.getElementById('speedVal').textContent = (5*animSpeed).toFixed(1) + 'x';
+}
+
+document.getElementById('btnSpeedMinus').addEventListener('click', () => {
+  animSpeed = Math.max(0.02, animSpeed - 0.02);
+  updateSpeedLabel();
+});
+
+document.getElementById('btnSpeedPlus').addEventListener('click', () => {
+  animSpeed = Math.min(1.00, animSpeed + 0.02);
+  updateSpeedLabel();
+});
 
 function setStatus(m) {
   document.getElementById('statusTxt').textContent = m;
@@ -977,7 +997,7 @@ function startAnim() {
     if (last === null) last = ts;
     const dt = Math.min((ts - last) / 1000, 0.05);
     last = ts;
-    animT = (animT + dt * 0.18) % 1;
+    animT = (animT + dt * animSpeed) % 1;
     draw();
     animFrame = requestAnimationFrame(step);
   }
@@ -1266,6 +1286,7 @@ window.addEventListener('resize', () => {
   setupCanvas();
   resetNodes();
   pushHistory();
+  updateSpeedLabel();
   draw();
 })();
 </script>
