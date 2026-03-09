@@ -750,58 +750,92 @@ function drawMiniPathPanel(x, y, w, h, pts, currentPt) {
 }
 
 function drawCamSubpanel(x, y, w, h, radii, thetaNow, color, label) {
+  const TWO_PI = Math.PI * 2;
   const cx = x + w / 2;
   const cy = y + h / 2;
   const maxR = Math.max(...radii);
-  const sc = 0.44 * Math.min(w, h) / Math.max(maxR, 1e-9);
+  const sc = 0.42 * Math.min(w, h) / Math.max(maxR, 1e-9);
+
+  // follower is a vertical slider sitting at the top
+  const followerRadius = 5.2;
+  const shaftTopY = y + 8;
+  const topDir = -Math.PI / 2;
+
+  // IMPORTANT:
+  // radii[] is a phase-indexed lift signal.
+  // We want phase 0 to be at the top when thetaNow = 0,
+  // and then the cam rotates by -thetaNow underneath the fixed follower.
+  const phaseOffset = topDir;
+
+  const rNow = interpPeriodic(radii, thetaNow / TWO_PI);
+  const camContactX = cx;
+  const camContactY = cy - sc * rNow;
+
+  const followerX = cx;
+  const followerY = camContactY - followerRadius;
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(44,49,112,0.18)';
+
+  // reference circle
+  ctx.strokeStyle = 'rgba(44,49,112,0.16)';
   ctx.lineWidth = 1.0;
   ctx.beginPath();
-  ctx.arc(cx, cy, sc * maxR, 0, Math.PI * 2);
+  ctx.arc(cx, cy, sc * maxR, 0, TWO_PI);
   ctx.stroke();
 
+  // rotating cam
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1.7;
+  ctx.lineWidth = 1.8;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.beginPath();
+
   radii.forEach((r, i) => {
-    const th = (i / radii.length) * Math.PI * 2;
-    const px = cx + sc * r * Math.cos(th);
-    const py = cy + sc * r * Math.sin(th);
+    const localTh = (i / radii.length) * TWO_PI + phaseOffset;
+    const worldTh = localTh - thetaNow;
+    const px = cx + sc * r * Math.cos(worldTh);
+    const py = cy + sc * r * Math.sin(worldTh);
     i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
   });
+
   ctx.closePath();
   ctx.stroke();
 
-  const rNow = interpPeriodic(radii, thetaNow / (2 * Math.PI));
-  const px = cx + sc * rNow * Math.cos(thetaNow);
-  const py = cy + sc * rNow * Math.sin(thetaNow);
-
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2.0;
+  // hub
   ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(px, py);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(px, py, 4.2, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 6;
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, 3.0, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 3.0, 0, TWO_PI);
   ctx.fillStyle = '#fff';
-  ctx.shadowBlur = 0;
   ctx.fill();
   ctx.strokeStyle = '#333';
   ctx.lineWidth = 0.8;
   ctx.stroke();
+
+  // follower stem
+  ctx.strokeStyle = 'rgba(44,49,112,0.48)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(cx, shaftTopY);
+  ctx.lineTo(cx, followerY - followerRadius);
+  ctx.stroke();
+
+  // follower roller
+  ctx.beginPath();
+  ctx.arc(followerX, followerY, followerRadius, 0, TWO_PI);
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = 'rgba(44,49,112,0.18)';
+  ctx.shadowBlur = 5;
+  ctx.fill();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // contact marker
+  ctx.beginPath();
+  ctx.arc(camContactX, camContactY, 2.2, 0, TWO_PI);
+  ctx.fillStyle = color;
+  ctx.fill();
+
   ctx.restore();
 
   ctx.save();
