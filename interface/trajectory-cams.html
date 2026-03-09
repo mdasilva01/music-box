@@ -423,6 +423,7 @@ let splineDirty = true;
 let _splineData = null;
 let _splinePts  = [];
 let animSpeed = 0.2;
+let selectedEmoji = '🩰';
 
 function resetNodes() {
   nodes = [];
@@ -658,8 +659,8 @@ function draw() {
     drawCamReproducedPath();
     drawCamPreview();
   }
-  if (animating) drawAnimDots();
   drawNodes();
+  if (animating) drawAnimDots();
 }
 
 function drawGrid() {
@@ -902,24 +903,27 @@ function roundRect(c, x, y, w, h, r) {
 
 function drawAnimDots() {
   const sp = evalSpline(animT);
+
   ctx.save();
-  ctx.beginPath();
-  ctx.arc(sp.x, sp.y, 7, 0, Math.PI * 2);
-  ctx.fillStyle = '#c45c2a';
-  ctx.shadowColor = '#c45c2a';
-  ctx.shadowBlur = 12;
-  ctx.fill();
+  ctx.font = '30px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(196,92,42,0.35)';
+  ctx.shadowBlur = 10;
+  ctx.fillText(selectedEmoji, sp.x, sp.y);
   ctx.restore();
 
   if (camSystem) {
     const s = camStateAt(camSystem, animT);
+
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 7, 0, Math.PI * 2);
-    ctx.fillStyle = '#7c3aed';
-    ctx.shadowColor = 'rgba(124,58,237,0.8)';
-    ctx.shadowBlur = 14;
-    ctx.fill();
+    ctx.font = '30px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.55;
+    ctx.shadowColor = 'rgba(124,58,237,0.35)';
+    ctx.shadowBlur = 10;
+    ctx.fillText(selectedEmoji, s.x, s.y);
     ctx.restore();
   }
 }
@@ -1062,6 +1066,7 @@ const PRESETS = [
   {name:'circle',     nodes:[[0, -1], [0.707, -0.707], [1, 0], [0.707, 0.707], [0, 1], [-0.707, 0.707], [-1, 0], [-0.707, -0.707]] },
   {name:'infinity', nodes:[[0,0],[1.5/3,-1/3],[3/3,0],[1.5/3,1/3],[0,0],[-1.5/3,-1/3],[-3/3,0],[-1.5/3,1/3]] },
   {name:'triple loop', nodes:[[0,-1/3], [1/3,0], [2/3,1/3], [3/3,0], [2/3, -1/3], [1/3,0], [0,1/3], [-1/3, 0], [-2/3,-1/3], [-3/3,0], [-2/3,1/3], [-1/3,0]] },
+  {name:'star', nodes:[[0,-1], [0.224,-0.309], [0.951,-0.309], [0.363,0.118], [0.588,0.809], [0,0.382], [-0.588,0.809], [-0.363,0.118], [-0.951,-0.309], [-0.224,-0.309]] }
 ];
 
 function renderThumb(presetNodes, size) {
@@ -1257,6 +1262,8 @@ document.querySelectorAll('.figure-card').forEach(c => {
   c.addEventListener('click', function() {
     document.querySelectorAll('.figure-card').forEach(x => x.classList.remove('active'));
     this.classList.add('active');
+    selectedEmoji = this.querySelector('.figure-icon').textContent.trim();
+    draw();
   });
 });
 
