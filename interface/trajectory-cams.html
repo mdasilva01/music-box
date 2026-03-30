@@ -182,6 +182,66 @@ body {
 .prog-bar  { height: 100%; background: var(--navy); width: 0; transition: width .12s; }
 .status-txt{ font-size: 10px; color: #4a5a7a; margin-top: 5px; font-style: italic; min-height: 13px; }
 
+.pts-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(44,49,112,0.15);
+  border-radius: 8px;
+  padding: 0 10px;
+  height: 34px;
+}
+
+#speedSlider {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+#speedSlider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(44,49,112,0.18);
+}
+
+#speedSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--navy);
+  border: 2px solid white;
+  margin-top: -5px;
+  box-shadow: 0 1px 4px rgba(44,49,112,0.18);
+}
+
+#speedSlider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(44,49,112,0.18);
+}
+
+#speedSlider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--navy);
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(44,49,112,0.18);
+  cursor: pointer;
+}
+
+.speed-readout {
+  flex: 0 0 42px;
+  text-align: right;
+  font-size: 12px;
+}
+
 .leg-row { display: flex; align-items: center; gap: 7px; font-size: 10px; color: #4a5a7a; padding: 2px 0; }
 .leg-line { width: 18px; height: 2.5px; border-radius: 2px; flex-shrink: 0; }
 
@@ -316,12 +376,19 @@ body {
         </div>
         <button class="tool-btn" id="toolReset">↺ Reset Shape</button>
         <button class="tool-btn" id="toolSynth">✦ Generate Cams</button>
+        <button class="tool-btn" id="downloadCams">⬇ Download Cams</button>
         <button class="tool-btn" id="toolAnimate">▶ Animate</button>
         <div class="pts-label">trajectory speed</div>
-        <div class="pts-row">
-          <button class="pts-btn" id="btnSpeedMinus">−</button>
-          <span class="pts-val" id="speedVal">0.18x</span>
-          <button class="pts-btn" id="btnSpeedPlus">+</button>
+        <div class="pts-slider-wrap">
+          <input
+            type="range"
+            id="speedSlider"
+            min="0.02"
+            max="1.00"
+            step="0.02"
+            value="0.20"
+          />
+          <span class="pts-val speed-readout" id="speedVal">1.0x</span>
         </div>
       </div>
       <div class="prog-wrap"><div class="prog-bar" id="pb"></div></div>
@@ -600,6 +667,64 @@ function camStateAt(sys, tau) {
   const ry = interpPeriodic(sys.camY, tau);
   const theta = ((tau % 1) + 1) % 1 * Math.PI * 2;
   return { x, y, rx, ry, theta };
+}
+
+function camToPolygon(theta, radii) {
+  return radii.map((r, i) => ({
+    x: r * Math.cos(theta[i]),
+    y: r * Math.sin(theta[i])
+  }));
+}
+
+function polygonToSVGPath(pts) {
+  if (!pts.length) return "";
+  return pts.map((p, i) =>
+    `${i === 0 ? "M" : "L"} ${p.x.toFixed(3)} ${p.y.toFixed(3)}`
+  ).join(" ") + " Z";
+}
+
+function downloadCamSVG(theta, radii, filename = "cam.svg", holeRadius = 3, scale = 0.2) {
+  const pts = camToPolygon(theta, radii).map(p => ({
+    x: p.x * scale,
+    y: p.y * scale
+  }));
+
+  const scaledHoleRadius = holeRadius * 1;
+  const d = polygonToSVGPath(pts);
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+
+  const pad = 10 * scale;
+  minX -= pad;
+  minY -= pad;
+  maxX += pad;
+  maxY += pad;
+
+  const w = maxX - minX;
+  const h = maxY - minY;
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="${minX} ${minY} ${w} ${h}"
+     width="${w}mm"
+     height="${h}mm">
+  <path d="${d}" fill="none" stroke="red" stroke-width="${0.1}"/>
+  <circle cx="0" cy="0" r="${scaledHoleRadius}" fill="none" stroke="red" stroke-width="${0.1}"/>
+</svg>`;
+
+  const blob = new Blob([svg], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ══════════════════════════════════════════════════════
@@ -969,17 +1094,15 @@ function renderParams() {
     <div class="pr"><span class="pk">samples</span><span class="pv">${camSystem.n}</span></div>
   `;
 }
+const speedSlider = document.getElementById('speedSlider');
+
 function updateSpeedLabel() {
-  document.getElementById('speedVal').textContent = (5*animSpeed).toFixed(1) + 'x';
+  document.getElementById('speedVal').textContent = (5 * animSpeed).toFixed(1) + 'x';
+  speedSlider.value = animSpeed.toFixed(2);
 }
 
-document.getElementById('btnSpeedMinus').addEventListener('click', () => {
-  animSpeed = Math.max(0.02, animSpeed - 0.02);
-  updateSpeedLabel();
-});
-
-document.getElementById('btnSpeedPlus').addEventListener('click', () => {
-  animSpeed = Math.min(1.00, animSpeed + 0.02);
+speedSlider.addEventListener('input', () => {
+  animSpeed = parseFloat(speedSlider.value);
   updateSpeedLabel();
 });
 
@@ -1230,6 +1353,25 @@ cv.addEventListener('touchend', () => { if (dragging !== null) pushHistory(); dr
 // Sidebar
 document.getElementById('toolReset').addEventListener('click', () => { resetNodes(); camSystem = null; document.getElementById('paramsPanel').style.display = 'none'; pushHistory(); draw(); });
 document.getElementById('toolSynth').addEventListener('click', generateCams);
+document.getElementById('downloadCams').addEventListener('click', () => {
+  if (!camSystem) {
+    setStatus('generate cams first');
+    return;
+  }
+
+  // higher resolution for export (smoother cut)
+  const sys = buildCamSystem(1000);
+
+  if (!sys) {
+    setStatus('failed to build cams');
+    return;
+  }
+
+  downloadCamSVG(sys.theta, sys.camX, "cam_X.svg", 3);
+  downloadCamSVG(sys.theta, sys.camY, "cam_Y.svg", 3);
+
+  setStatus('downloaded cam_X.svg + cam_Y.svg');
+});
 document.getElementById('toolAnimate').addEventListener('click', () => animating ? stopAnim() : startAnim());
 
 document.getElementById('btnPlus').addEventListener('click', () => {
@@ -1298,6 +1440,7 @@ window.addEventListener('resize', () => {
   updateSpeedLabel();
   draw();
 })();
+
 </script>
 </body>
 </html>
