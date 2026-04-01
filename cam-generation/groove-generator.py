@@ -178,7 +178,7 @@ def compute_frames(centerline):
     return tangents, normals, binormals
 
 # ============================================================
-# GROOVE TUBE MESH
+# GROOVE TUBE MESH (uniform or per-point varying radius)
 # ============================================================
 
 def build_groove_tube(centerline, tube_radius, n_profile=N_PROFILE):
@@ -254,19 +254,9 @@ if __name__ == "__main__":
         ]
         base = "cam_output"
 
-    WALL = 3.0
-
     mapped = coord_map(input_pts)
     mapped = scale_to_target_size(mapped, CAM_RADIUS * 2)
 
-    print("Building groove tube...")
     groove = build_groove_tube(mapped, GROOVE_RADIUS)
-
-    print("Building cam body (inflated tube)...")
-    body = build_groove_tube(mapped, GROOVE_RADIUS + WALL)
-
-    print("Subtracting groove from body...")
-    cam = boolean_subtract(body, groove)
-
-    cam.export(base + "_cam.stl")
-    print(f"Wrote cam: {base}_cam.stl")
+    groove.export(base + "_groove.stl")
+    print(f"Wrote groove: {base}_groove.stl")

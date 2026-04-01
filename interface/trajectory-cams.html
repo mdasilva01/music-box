@@ -377,6 +377,7 @@ body {
         <button class="tool-btn" id="toolReset">↺ Reset Shape</button>
         <button class="tool-btn" id="toolSynth">✦ Generate Cams</button>
         <button class="tool-btn" id="downloadCams">⬇ Download CSV</button>
+        <button class="tool-btn" id="downloadSTL">⬇ Download STL</button>
         <button class="tool-btn" id="toolAnimate">▶ Animate</button>
         <div class="pts-label">trajectory speed</div>
         <div class="pts-slider-wrap">
@@ -1401,6 +1402,117 @@ document.getElementById('downloadCams').addEventListener('click', () => {
   setStatus(`downloaded trajectory.csv (${sys.xs.length} points)`);
 });
 document.getElementById('toolAnimate').addEventListener('click', () => animating ? stopAnim() : startAnim());
+
+// ══════════════════════════════════════════════════════
+// STL GROOVE EXPORT
+// ══════════════════════════════════════════════════════
+
+const STL_R        = 25.0;
+const STL_TARGET   = 50.0;
+const STL_GROOVE_R = 2.5;
+const STL_N_PROF   = 24;
+
+function dot3(a,b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
+function cross3(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function sub3(a,b){ return [a[0]-b[0],a[1]-b[1],a[2]-b[2]]; }
+function scale3(s,v){ return [s*v[0],s*v[1],s*v[2]]; }
+function norm3(v){ const l=Math.hypot(...v); return l>1e-12?v.map(x=>x/l):[1,0,0]; }
+
+function stlCoordMap(pts2d) {
+  const n = pts2d.length;
+  const xs = pts2d.map(p => p.x), ys = pts2d.map(p => p.y);
+  const midX = 0.5*(Math.max(...xs)+Math.min(...xs));
+  const minY = Math.min(...ys);
+  const xc = xs.map(v => v-midX);
+  const yc = ys.map(v => v+STL_R-minY);
+  return xc.map((x,i) => {
+    const th = 2*Math.PI*i/n;
+    return [x, yc[i]*Math.cos(th), yc[i]*Math.sin(th)];
+  });
+}
+
+function stlScale(pts, target) {
+  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]), zs=pts.map(p=>p[2]);
+  const span = Math.max(Math.max(...xs)-Math.min(...xs), Math.max(...ys)-Math.min(...ys), Math.max(...zs)-Math.min(...zs));
+  if (span < 1e-12) return pts;
+  const s = target/span;
+  return pts.map(p => [p[0]*s, p[1]*s, p[2]*s]);
+}
+
+function stlFrames(c) {
+  const n = c.length, T=[], N=[], B=[];
+  for (let i=0;i<n;i++){
+    const pr=c[(i-1+n)%n], nx=c[(i+1)%n];
+    const d=[nx[0]-pr[0],nx[1]-pr[1],nx[2]-pr[2]];
+    T.push(norm3(d));
+  }
+  let ref=[0,0,1];
+  if (Math.abs(dot3(ref,T[0]))>0.9) ref=[1,0,0];
+  let n0=norm3(sub3(ref,scale3(dot3(ref,T[0]),T[0])));
+  N.push(n0); B.push(norm3(cross3(T[0],n0)));
+  for (let i=1;i<n;i++){
+    let nv=sub3(N[i-1],scale3(dot3(N[i-1],T[i]),T[i]));
+    if (Math.hypot(...nv)<1e-12){
+      let fb=[0,0,1];
+      if(Math.abs(dot3(fb,T[i]))>0.9) fb=[1,0,0];
+      nv=sub3(fb,scale3(dot3(fb,T[i]),T[i]));
+    }
+    N.push(norm3(nv)); B.push(norm3(cross3(T[i],N[i])));
+  }
+  return {N,B};
+}
+
+function stlBuildTube(c, r) {
+  const n=c.length, np=STL_N_PROF;
+  const {N,B}=stlFrames(c);
+  const verts=[];
+  for (let i=0;i<n;i++)
+    for (let j=0;j<np;j++){
+      const a=2*Math.PI*j/np, ca=Math.cos(a), sa=Math.sin(a);
+      verts.push([
+        c[i][0]+r*(ca*N[i][0]+sa*B[i][0]),
+        c[i][1]+r*(ca*N[i][1]+sa*B[i][1]),
+        c[i][2]+r*(ca*N[i][2]+sa*B[i][2])
+      ]);
+    }
+  const faces=[];
+  for (let i=0;i<n;i++){
+    const i2=(i+1)%n;
+    for (let j=0;j<np;j++){
+      const j2=(j+1)%np;
+      const a=i*np+j, b=i2*np+j, cc=i2*np+j2, d=i*np+j2;
+      faces.push([a,b,cc],[a,cc,d]);
+    }
+  }
+  return {verts,faces};
+}
+
+function stlWrite(verts, faces) {
+  const buf=new ArrayBuffer(80+4+faces.length*50);
+  const v=new DataView(buf);
+  let o=80;
+  v.setUint32(o,faces.length,true); o+=4;
+  for (const [i0,i1,i2] of faces){
+    const p0=verts[i0],p1=verts[i1],p2=verts[i2];
+    const n=norm3(cross3(sub3(p1,p0),sub3(p2,p0)));
+    for (const x of [...n,...p0,...p1,...p2]){ v.setFloat32(o,x,true); o+=4; }
+    v.setUint16(o,0,true); o+=2;
+  }
+  return buf;
+}
+
+document.getElementById('downloadSTL').addEventListener('click', () => {
+  const pts = sampleTargetPts(480);
+  if (!pts || pts.length < 10) { setStatus('draw a path first'); return; }
+  const mapped = stlScale(stlCoordMap(pts), STL_TARGET);
+  const {verts,faces} = stlBuildTube(mapped, STL_GROOVE_R);
+  const blob = new Blob([stlWrite(verts,faces)], {type:'application/octet-stream'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='groove.stl'; a.click();
+  URL.revokeObjectURL(url);
+  setStatus('downloaded groove.stl');
+});
 
 document.getElementById('btnPlus').addEventListener('click', () => {
   if (numPts >= 12) return;
