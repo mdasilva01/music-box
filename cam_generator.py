@@ -32,11 +32,30 @@ THE KEY MATH (Section 4.1-4.2 of paper):
   rotation, and the follower (constrained to the cylinder surface)
   gets pushed to exactly trace the original target path.
 
+FOLLOWER GEOMETRY (camMech_1T1R):
+  The follower is an L-shaped assembly consisting of:
+    1. Shaft sleeve  — hollow cylinder around the central shaft,
+                       slides and rotates freely (cylindrical joint).
+                       Inner radius = SHAFT_RADIUS + FOLLOWER_CLEARANCE
+                       Outer radius = SHAFT_RADIUS + FOLLOWER_SLEEVE_WALL
+                       Height       = CAM_HEIGHT
+    2. Horizontal arm — solid cylinder extending radially at Z=CAM_HEIGHT/2,
+                        from sleeve outer surface to FOLLOWER_RADIUS.
+                        Radius = GROOVE_BALL_R + GROOVE_WALL (same as groove width)
+    3. Hemisphere tip — half-sphere at the arm end, flat face flush with arm tip,
+                        dome pointing radially inward into the groove.
+                        Radius = GROOVE_BALL_R
+  All dimensions auto-derive from the cam parameters — no extra constants needed
+  except FOLLOWER_CLEARANCE (fit gap) and FOLLOWER_SLEEVE_WALL (wall thickness).
+
 USAGE:
   python cam_generator.py                   # built-in lemniscate demo
   python cam_generator.py sine              # other built-in demos
   python cam_generator.py my_path.csv       # your own trajectory
   python cam_generator.py my_path.csv out.stl
+
+  # Follower STL is always written alongside the cam STL:
+  #   <base>_cam.stl  and  <base>_follower.stl
 
 INPUT CSV FORMAT (3 columns, no header required):
   x, y, z   (one point per row)
@@ -57,9 +76,14 @@ FOLLOWER_RADIUS   = 20.0   # mm  radius of follower ball path (< CAM_RADIUS - gr
 GROOVE_BALL_R     =  2.5   # mm  follower ball radius
 GROOVE_WALL       =  1.5   # mm  groove wall thickness on each side
 
+# Follower-specific parameters (derived from cam params where possible)
+FOLLOWER_CLEARANCE  = 0.2   # mm  radial clearance between shaft and sleeve bore
+FOLLOWER_SLEEVE_WALL = 3.0  # mm  sleeve wall thickness (bore to outer surface)
+
 N_THETA   = 360   # angular resolution of pitch curve
 N_PROFILE =  16   # cross-section resolution of groove tube
 N_CAP     = 180   # resolution of cylinder walls/caps
+N_SPHERE  =  32   # latitude/longitude resolution of hemisphere tip
 
 # ─── DEMO TRAJECTORIES ─────────────────────────────────────────────────────────
 # Target Q(u): closed curve on cylinder of radius FOLLOWER_RADIUS.
@@ -324,6 +348,242 @@ def build_hollow_cylinder(outer_r, inner_r, height, n=N_CAP):
 
     return np.array(verts, dtype=float), np.array(tris, dtype=np.int32)
 
+# ─── FOLLOWER GEOMETRY ──────────────────────────────────────────────────────────
+# The follower is an L-shaped assembly:
+#
+#   Z
+#   ▲
+#   │  ┌──────────────────────────────────┐  ← top cap
+#   │  │         shaft sleeve             │
+#   │  │  (hollow cylinder, slides on Z   │
+#   │  │   and rotates about Z freely)    │
+#   │  │                                  │
+#   │  │          ┌═══════════════╗       │  ← horizontal arm at Z=CAM_HEIGHT/2
+#   │  │          │    arm        ║●)     │    hemisphere tip at FOLLOWER_RADIUS
+#   │  │          └═══════════════╝       │
+#   │  │                                  │
+#   │  └──────────────────────────────────┘  ← bottom cap
+#   └──────────────────────────────────────► X
+#      ├──┤                        ├──────┤
+#   shaft bore              arm length
+#
+# Dimensions (all auto-derived from cam parameters):
+#   Sleeve bore inner radius = SHAFT_RADIUS + FOLLOWER_CLEARANCE
+#   Sleeve outer radius      = SHAFT_RADIUS + FOLLOWER_CLEARANCE + FOLLOWER_SLEEVE_WALL
+#   Sleeve height            = CAM_HEIGHT
+#   Arm inner radius (rod)   = GROOVE_BALL_R + GROOVE_WALL   (matches groove half-width)
+#   Arm start                = sleeve outer radius
+#   Arm end                  = FOLLOWER_RADIUS               (ball center at pitch radius)
+#   Arm Z center             = CAM_HEIGHT / 2
+#   Hemisphere radius        = GROOVE_BALL_R
+#   Hemisphere flat face     = flush with arm tip (at FOLLOWER_RADIUS)
+#   Hemisphere dome          = points radially inward (−X direction)
+
+def build_solid_cylinder(outer_r, inner_r, z_bot, z_top, n=N_CAP):
+    """
+    Annular cylinder (tube) with closed end caps.
+    Outer normal outward, inner normal inward (manifold solid).
+    """
+    verts = []
+
+    def ring(r, z):
+        return [[r*np.cos(2*np.pi*i/n), r*np.sin(2*np.pi*i/n), z] for i in range(n)]
+
+    ob = len(verts); verts.extend(ring(outer_r, z_bot))
+    ot = len(verts); verts.extend(ring(outer_r, z_top))
+    ib = len(verts); verts.extend(ring(inner_r, z_bot))
+    it = len(verts); verts.extend(ring(inner_r, z_top))
+
+    tris = []
+    for i in range(n):
+        i2 = (i+1) % n
+        tris += [(ob+i, ob+i2, ot+i2), (ob+i, ot+i2, ot+i)]   # outer wall
+        tris += [(ib+i, it+i,  it+i2), (ib+i, it+i2, ib+i2)]  # inner wall (flipped)
+        tris += [(ib+i, ib+i2, ob+i2), (ib+i, ob+i2, ob+i)]   # bottom cap
+        tris += [(it+i, ot+i,  ot+i2), (it+i, ot+i2, it+i2)]  # top cap
+
+    return np.array(verts, dtype=float), np.array(tris, dtype=np.int32)
+
+
+def build_follower_arm(sleeve_outer_r, arm_end_r, arm_r, arm_z, n=N_CAP):
+    """
+    Solid horizontal arm (filled cylinder) aligned with +X axis,
+    spanning from sleeve_outer_r to arm_end_r at height arm_z.
+
+    Because the arm is a radial rod (not an annulus), inner_r = 0 would give
+    a solid disk cap, but we model it as a thin-walled tube with a solid end
+    cap at each end for cleanliness. We use inner_r=0 (solid rod).
+
+    The arm is a capped solid cylinder lying along X, so we build it as
+    a stack of rings swept from x=sleeve_outer_r to x=arm_end_r along +X,
+    each ring in the Y-Z plane.
+    """
+    x0 = sleeve_outer_r
+    x1 = arm_end_r   # stop before hemisphere center so tip is flush
+
+    verts = []
+    tris  = []
+
+    # Ring at x0 (back, facing −X)
+    base = len(verts)
+    for i in range(n):
+        angle = 2*np.pi*i/n
+        verts.append([x0, arm_r*np.cos(angle), arm_z + arm_r*np.sin(angle)])
+
+    # Ring at x1 (front, facing +X)
+    front = len(verts)
+    for i in range(n):
+        angle = 2*np.pi*i/n
+        verts.append([x1, arm_r*np.cos(angle), arm_z + arm_r*np.sin(angle)])
+
+    # Side wall
+    for i in range(n):
+        i2 = (i+1) % n
+        a, b, c2, d = base+i, front+i, front+i2, base+i2
+        tris += [(a, b, c2), (a, c2, d)]
+
+    # Back cap (normal −X): fan from center at x0
+    ctr_back = len(verts)
+    verts.append([x0, 0.0, arm_z])
+    for i in range(n):
+        i2 = (i+1) % n
+        # Winding for −X normal: clockwise when viewed from −X
+        tris.append((ctr_back, base+i2, base+i))
+
+    # Front cap (normal +X): fan from center at x1
+    # NOTE: The front cap is NOT added here because the hemisphere base
+    # will be welded flush against it.  We leave the front open so the
+    # hemisphere base disk seals it.
+
+    return np.array(verts, dtype=float), np.array(tris, dtype=np.int32)
+
+
+def build_hemisphere_tip(center_x, arm_z, n_lat=N_SPHERE, n_lon=N_SPHERE):
+    """
+    Hemisphere with flat face at x=center_x, dome pointing in the −X direction.
+
+    The flat face disk seals the open end of the follower arm.
+    The dome sits inside the cam groove, contacting the groove walls.
+
+      flat face (x = center_x)     dome apex (x = center_x − GROOVE_BALL_R)
+           |←────── GROOVE_BALL_R ──────→|
+           ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━●
+           │         hemisphere          │
+           ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━●
+
+    Latitude 0 = equator (the flat rim), latitude π/2 = dome apex.
+    """
+    R  = GROOVE_BALL_R
+    cx = center_x   # x-coordinate of the flat face / ball center
+    cy = 0.0        # arm lies along +X axis at y=0
+    cz = arm_z      # arm Z-center
+
+    verts = []
+    tris  = []
+
+    # Build latitude rings from equator (lat=0) to near-apex
+    # lat goes 0 → π/2 (equator to pole)
+    n_lat_rings = max(n_lat // 2, 4)
+    lats = np.linspace(0, np.pi/2, n_lat_rings + 1)
+
+    rings = []
+    for lat in lats:
+        ring_r = R * np.cos(lat)   # radius of this latitude circle
+        ring_x = cx - R * np.sin(lat)  # x recedes into −X as lat increases
+        ring = []
+        for j in range(n_lon):
+            angle = 2*np.pi*j/n_lon
+            ring.append([ring_x,
+                         cy + ring_r*np.cos(angle),
+                         cz + ring_r*np.sin(angle)])
+        rings.append(ring)
+
+    # Flatten rings into vertex list
+    ring_starts = []
+    for ring in rings:
+        ring_starts.append(len(verts))
+        verts.extend(ring)
+
+    # Apex vertex
+    apex_idx = len(verts)
+    verts.append([cx - R, cy, cz])
+
+    # Side quads between consecutive latitude rings
+    for ri in range(len(rings) - 1):
+        r0 = ring_starts[ri]
+        r1 = ring_starts[ri + 1]
+        for j in range(n_lon):
+            j2 = (j+1) % n_lon
+            a, b  = r0+j,  r0+j2
+            c2, d = r1+j2, r1+j
+            tris += [(a, b, c2), (a, c2, d)]
+
+    # Apex fan from last ring
+    last_r = ring_starts[-1]
+    for j in range(n_lon):
+        j2 = (j+1) % n_lon
+        tris.append((last_r+j, apex_idx, last_r+j2))
+
+    # Flat base disk (normal +X, seals the arm opening)
+    # Fan from center of flat face outward
+    flat_center_idx = len(verts)
+    verts.append([cx, cy, cz])
+    equator_start = ring_starts[0]
+    for j in range(n_lon):
+        j2 = (j+1) % n_lon
+        # +X normal: counter-clockwise when viewed from +X
+        tris.append((flat_center_idx, equator_start+j2, equator_start+j))
+
+    return np.array(verts, dtype=float), np.array(tris, dtype=np.int32)
+
+
+def build_follower():
+    """
+    Assemble the complete L-shaped follower as a single combined mesh.
+
+    Parts:
+      1. Shaft sleeve  — hollow cylinder, bore = SHAFT_RADIUS + FOLLOWER_CLEARANCE,
+                         outer = bore + FOLLOWER_SLEEVE_WALL, height = CAM_HEIGHT
+      2. Horizontal arm — solid rod along +X, from sleeve outer to FOLLOWER_RADIUS,
+                          radius = GROOVE_BALL_R + GROOVE_WALL
+      3. Hemisphere tip — GROOVE_BALL_R dome at x=FOLLOWER_RADIUS, into the groove
+
+    The follower rests at its HOME position: arm pointing along +X at Z=CAM_HEIGHT/2.
+    The shaft bore is centered on the Z-axis, matching the cam's rotation axis.
+    """
+    bore_r   = SHAFT_RADIUS + FOLLOWER_CLEARANCE
+    sleeve_r = bore_r + FOLLOWER_SLEEVE_WALL
+    arm_r    = GROOVE_BALL_R + GROOVE_WALL      # arm cross-section radius
+    arm_z    = CAM_HEIGHT / 2.0                 # arm exits sleeve at mid-height
+    arm_end  = FOLLOWER_RADIUS                  # arm tip x-coordinate (ball center)
+
+    print(f"         Sleeve: bore={bore_r:.1f}mm  outer={sleeve_r:.1f}mm  H={CAM_HEIGHT:.1f}mm")
+    print(f"         Arm:    R={arm_r:.1f}mm  from x={sleeve_r:.1f} to x={arm_end:.1f}mm  at Z={arm_z:.1f}mm")
+    print(f"         Tip:    hemisphere R={GROOVE_BALL_R:.1f}mm  flat at x={arm_end:.1f}mm  dome→−X")
+
+    # 1. Shaft sleeve
+    sv, st = build_solid_cylinder(sleeve_r, bore_r, 0, CAM_HEIGHT)
+
+    # 2. Horizontal arm (leaves sleeve outer wall, ends at ball center)
+    av, at = build_follower_arm(sleeve_r, arm_end, arm_r, arm_z)
+
+    # 3. Hemisphere tip
+    hv, ht = build_hemisphere_tip(arm_end, arm_z)
+
+    # Combine all meshes: offset triangle indices by cumulative vertex counts
+    offset_a = len(sv)
+    offset_h = offset_a + len(av)
+
+    at_off = at + offset_a
+    ht_off = ht + offset_h
+
+    all_verts = np.vstack([sv, av, hv])
+    all_tris  = np.vstack([st, at_off, ht_off])
+
+    print(f"         Follower tris: sleeve={len(st):,}  arm={len(at):,}  tip={len(ht):,}  total={len(all_tris):,}")
+
+    return all_verts, all_tris
+
 # ─── STL WRITER ─────────────────────────────────────────────────────────────────
 
 def tri_normal(v0, v1, v2):
@@ -351,7 +611,7 @@ def write_stl(path, meshes):
 
 # ─── MAIN ───────────────────────────────────────────────────────────────────────
 
-def generate_cam(Q_input, output_path):
+def generate_cam(Q_input, cam_path, follower_path):
     print(f"\n{'='*60}")
     print(f"  3D Cam Generator  (camMech_1T1R, Cheng et al. 2021)")
     print(f"{'='*60}")
@@ -360,7 +620,7 @@ def generate_cam(Q_input, output_path):
     print()
 
     # 1. Resample target trajectory uniformly by arc-length
-    print("  [1/5]  Resampling target trajectory...")
+    print("  [1/6]  Resampling target trajectory...")
     Q = resample_arclength(Q_input, N_THETA)
     z_travel = Q[:,2].max() - Q[:,2].min()
     phi = np.arctan2(Q[:,1], Q[:,0])
@@ -368,7 +628,7 @@ def generate_cam(Q_input, output_path):
     print(f"         Z travel: {z_travel:.1f} mm   φ travel: {phi_travel:.1f}°")
 
     # 2. Compute pitch curve C(s) = R_z(-θ_c) * Q(u)
-    print("  [2/5]  Computing pitch curve in cam frame...")
+    print("  [2/6]  Computing pitch curve in cam frame...")
     print("         (Paper Eq.2: C(s) = R_z(-θ_c) * Q(u))")
     C = compute_pitch_curve(Q)
     r_C = np.linalg.norm(C[:,:2], axis=1)
@@ -383,47 +643,70 @@ def generate_cam(Q_input, output_path):
         print(f"  ⚠  WARNING: Pitch curve may exceed cam radius!")
 
     # 3. Frenet frames
-    print("  [3/5]  Computing Frenet frames...")
+    print("  [3/6]  Computing Frenet frames...")
     T_f, N_f, B_f = compute_frames(C)
 
-    # 4. Build meshes
-    print("  [4/5]  Building geometry...")
+    # 4. Build cam meshes
+    print("  [4/6]  Building cam geometry...")
     groove_verts, groove_tris = build_groove_tube(C, T_f, N_f, B_f)
     cyl_verts,    cyl_tris    = build_hollow_cylinder(CAM_RADIUS, SHAFT_RADIUS, CAM_HEIGHT)
     print(f"         Cylinder: {len(cyl_tris):,} tris")
     print(f"         Groove:   {len(groove_tris):,} tris")
 
-    # 5. Write STL
-    print(f"  [5/5]  Writing {output_path} ...")
-    total = write_stl(output_path, [(cyl_verts, cyl_tris), (groove_verts, groove_tris)])
-    print(f"         Total triangles: {total:,}")
-    print(f"\n  ✓  Done: {output_path}")
+    # 5. Build follower mesh
+    print("  [5/6]  Building follower geometry...")
+    fol_verts, fol_tris = build_follower()
+
+    # 6. Write STLs
+    print(f"  [6/6]  Writing STL files...")
+    cam_total = write_stl(cam_path,      [(cyl_verts, cyl_tris), (groove_verts, groove_tris)])
+    fol_total = write_stl(follower_path, [(fol_verts, fol_tris)])
+    print(f"         Cam:      {cam_total:,} tris  →  {cam_path}")
+    print(f"         Follower: {fol_total:,} tris  →  {follower_path}")
+    print(f"\n  ✓  Done.")
+    print(f"{'='*60}\n")
+    print(f"  ASSEMBLY NOTES:")
+    print(f"    • Follower home position: arm along +X, tip at x={FOLLOWER_RADIUS:.1f}mm, z={CAM_HEIGHT/2:.1f}mm")
+    print(f"    • Sleeve bore inner R = {SHAFT_RADIUS + FOLLOWER_CLEARANCE:.2f}mm  (shaft R + {FOLLOWER_CLEARANCE}mm clearance)")
+    print(f"    • Arm tip hemisphere sits in cam groove at R={FOLLOWER_RADIUS:.1f}mm")
+    print(f"    • Both parts share the same origin (Z-axis = cam/shaft axis)")
     print(f"{'='*60}\n")
 
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    csv_file = out_file = None
+    csv_file = out_cam = None
     demo_name = "lemniscate"
 
     for a in args:
         al = a.lower()
         if al.endswith('.csv') or al.endswith('.txt'): csv_file = a
-        elif al.endswith('.stl'):                       out_file = a
-        elif al in DEMOS:                              demo_name = al
+        elif al.endswith('.stl'):
+            if out_cam is None: out_cam = a
+        elif al in DEMOS: demo_name = al
 
     if csv_file:
         if not os.path.exists(csv_file):
             print(f"ERROR: '{csv_file}' not found"); sys.exit(1)
         print(f"Loading: {csv_file}")
         Q = project_to_cylinder(load_csv(csv_file))
+        base = os.path.splitext(csv_file)[0]
     else:
         print(f"Demo: '{demo_name}'  (options: {', '.join(DEMOS)})")
-        print(f"Usage: python cam_generator.py [curve.csv] [out.stl] [demo_name]\n")
+        print(f"Usage: python cam_generator.py [curve.csv] [out_cam.stl] [demo_name]\n")
         Q = DEMOS[demo_name]()
+        base = demo_name
 
-    if not out_file:
-        base = os.path.splitext(csv_file)[0] if csv_file else demo_name
-        out_file = f"cam_{base}.stl"
+    # Derive output paths: <base>_cam.stl and <base>_follower.stl
+    if out_cam is None:
+        out_cam = f"{base}_cam.stl"
+    # Follower always mirrors cam filename with _follower suffix
+    cam_stem      = out_cam[:-4] if out_cam.endswith('.stl') else out_cam
+    # Strip trailing _cam if present, then add _follower
+    if cam_stem.endswith('_cam'):
+        fol_stem = cam_stem[:-4]
+    else:
+        fol_stem = cam_stem
+    out_follower = f"{fol_stem}_follower.stl"
 
-    generate_cam(Q, out_file)
+    generate_cam(Q, out_cam, out_follower)

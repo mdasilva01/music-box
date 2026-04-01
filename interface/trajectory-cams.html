@@ -376,7 +376,7 @@ body {
         </div>
         <button class="tool-btn" id="toolReset">↺ Reset Shape</button>
         <button class="tool-btn" id="toolSynth">✦ Generate Cams</button>
-        <button class="tool-btn" id="downloadCams">⬇ Download Cams</button>
+        <button class="tool-btn" id="downloadCams">⬇ Download CSV</button>
         <button class="tool-btn" id="toolAnimate">▶ Animate</button>
         <div class="pts-label">trajectory speed</div>
         <div class="pts-slider-wrap">
@@ -600,9 +600,36 @@ function getCachedSplinePts(sps) {
 }
 
 function sampleTargetPts(N) {
+  // Arc-length reparametrization: distribute N samples uniformly by distance
+  // around the full loop, not uniformly in spline parameter space.
+  const DENSE = 2000;
+  const densePts = new Array(DENSE);
+  const denseT   = new Array(DENSE);
+  for (let i = 0; i < DENSE; i++) {
+    denseT[i]   = i / DENSE;
+    densePts[i] = evalSpline(denseT[i]);
+  }
+
+  // Cumulative arc length (closed loop — wrap last→first)
+  const cumLen = new Float64Array(DENSE + 1);
+  for (let i = 1; i < DENSE; i++) {
+    const dx = densePts[i].x - densePts[i - 1].x;
+    const dy = densePts[i].y - densePts[i - 1].y;
+    cumLen[i] = cumLen[i - 1] + Math.sqrt(dx * dx + dy * dy);
+  }
+  const dx0 = densePts[0].x - densePts[DENSE - 1].x;
+  const dy0 = densePts[0].y - densePts[DENSE - 1].y;
+  cumLen[DENSE] = cumLen[DENSE - 1] + Math.sqrt(dx0 * dx0 + dy0 * dy0);
+  const totalLen = cumLen[DENSE];
+
   const out = [];
+  let j = 0;
   for (let i = 0; i < N; i++) {
-    out.push(evalSpline(i / N));
+    const target = (i / N) * totalLen;
+    while (j < DENSE - 1 && cumLen[j + 1] < target) j++;
+    const span = cumLen[j + 1] - cumLen[j];
+    const frac = span > 0 ? (target - cumLen[j]) / span : 0;
+    out.push(evalSpline(denseT[j] + frac * (1 / DENSE)));
   }
   return out;
 }
@@ -997,7 +1024,7 @@ function drawCamPreview() {
   const subW = (bw - 2 * margin - gap) / 2;
   const subH = topH - 20;
 
-  drawCamSubpanel(bx + margin, by + 10, subW, subH, camSystem.camX, state.theta, '#d14444', 'Cam X');
+  drawCamSubpanel(bx + margin, by + 10, subW, subH, camSystem.camX, state.theta, '#d14444', 'pX');
   drawCamSubpanel(bx + margin + subW + gap, by + 10, subW, subH, camSystem.camY, state.theta, '#2f6dd6', 'Cam Y');
 
   const pathY = by + topH + 4;
@@ -1359,18 +1386,19 @@ document.getElementById('downloadCams').addEventListener('click', () => {
     return;
   }
 
-  // higher resolution for export (smoother cut)
   const sys = buildCamSystem(1000);
+  if (!sys) { setStatus('failed to build cams'); return; }
 
-  if (!sys) {
-    setStatus('failed to build cams');
-    return;
-  }
+  const rows = sys.xs.map((x, i) => `${x.toFixed(4)},${sys.ys[i].toFixed(4)}`);
+  const csv  = rows.join('\n');
 
-  downloadCamSVG(sys.theta, sys.camX, "cam_X.svg", 3);
-  downloadCamSVG(sys.theta, sys.camY, "cam_Y.svg", 3);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'trajectory.csv'; a.click();
+  URL.revokeObjectURL(url);
 
-  setStatus('downloaded cam_X.svg + cam_Y.svg');
+  setStatus(`downloaded trajectory.csv (${sys.xs.length} points)`);
 });
 document.getElementById('toolAnimate').addEventListener('click', () => animating ? stopAnim() : startAnim());
 
