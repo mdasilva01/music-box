@@ -69,12 +69,12 @@ import numpy as np
 
 # ─── PARAMETERS ────────────────────────────────────────────────────────────────
 
-CAM_RADIUS        = 30.0   # mm  outer radius of the cam cylinder
-CAM_HEIGHT        = 50.0   # mm  total height
+CAM_RADIUS        = 18.0   # mm  outer radius of the cam cylinder
+CAM_HEIGHT        = 55.0   # mm  total height
 SHAFT_RADIUS      =  4.0   # mm  central hole radius (motor axle)
 FOLLOWER_RADIUS   = 20.0   # mm  radius of follower ball path (< CAM_RADIUS - groove width)
 GROOVE_BALL_R     =  2.5   # mm  follower ball radius
-GROOVE_WALL       =  1.5   # mm  groove wall thickness on each side
+GROOVE_WALL       =  2   # mm  groove wall thickness on each side
 
 # Follower-specific parameters (derived from cam params where possible)
 FOLLOWER_CLEARANCE  = 0.2   # mm  radial clearance between shaft and sleeve bore
@@ -324,7 +324,6 @@ def build_groove_tube(C, T, N_f, B_f):
 def build_hollow_cylinder(outer_r, inner_r, height, n=N_CAP):
     """Closed hollow cylinder (annular tube): outer wall, inner wall, top cap, bottom cap."""
     verts = []
-
     def ring(r, z, count=n):
         return [[r*np.cos(2*np.pi*i/count), r*np.sin(2*np.pi*i/count), z]
                 for i in range(count)]
