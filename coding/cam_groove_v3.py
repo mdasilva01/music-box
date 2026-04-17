@@ -25,27 +25,38 @@ Final solid = union(rotated prisms) - union(rotated spheres)
 """
 
 import numpy as np
+from pathlib import Path
 import struct, os
 from skimage import measure
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-N        = 1000
-R        = 10.0
-r_g      = 2.5
-P        = 2
-HALF_H   = 15.0
-GRID_RES = 250
+R        = 10.0 # mm
+r_g      = 2.5 # mm
+P        = 2 # mm
+HALF_H   = 15.0 # mm
+GRID_RES = 150 # size of 3d grid
+inp = input()
+CSV_PATH = f"~/Downloads/{inp}.csv"   # List of x,y coordinates
 
-# ── Lissajous figure-8 ────────────────────────────────────────────────────────
+# ── Read arbitrary closed curve from CSV ─────────────────────────────────────
+pts = np.loadtxt(Path(CSV_PATH).expanduser(), delimiter=",")
+x_t = pts[:, 0]
+y_t = pts[:, 1]
+
+N = len(x_t)                     # override N from the CSV length
 t = np.linspace(0, 1, N, endpoint=False)
 
-x_t = np.sin(2 * np.pi * t) * (HALF_H - r_g - 1.0)
-y_t = np.sin(4 * np.pi * t) * 4.0
+# Shift/scale x/y as needed to fit your cam height budget
+x_t = (x_t - np.mean(x_t)) / np.std(x_t)         
+y_t = (y_t - np.mean(y_t)) / np.std(y_t)  
+y_t -= np.min(y_t)
+print(x_t)
+print(y_t)
 
-y_min = y_t.min()
-r_t   = R + y_t - y_min          # always >= R
+# Make radius always valid
+r_t = R + y_t          # always >= R
 
 theta = 2 * np.pi * t
 
