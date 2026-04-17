@@ -1387,7 +1387,7 @@ document.getElementById('downloadCams').addEventListener('click', () => {
     return;
   }
 
-  const sys = buildCamSystem(1000);
+  const sys = buildCamSystem(2000);
   if (!sys) { setStatus('failed to build cams'); return; }
 
   const rows = sys.xs.map((x, i) => `${x.toFixed(4)},${sys.ys[i].toFixed(4)}`);

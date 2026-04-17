@@ -31,29 +31,31 @@ from skimage import measure
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
+inp = input()
+
 # ── Parameters ────────────────────────────────────────────────────────────────
 R        = 10.0 # mm
 r_g      = 2.5 # mm
 P        = 2 # mm
 HALF_H   = 15.0 # mm
-GRID_RES = 150 # size of 3d grid
-inp = input()
+GRID_RES = 100 # size of 3d grid
 CSV_PATH = f"~/Downloads/{inp}.csv"   # List of x,y coordinates
+SCALE = 0.2     # Scaling of x,y points (0,1)
+COVERAGE = 0.65 # value to determine how much the groove is covered (0,1)
 
 # ── Read arbitrary closed curve from CSV ─────────────────────────────────────
 pts = np.loadtxt(Path(CSV_PATH).expanduser(), delimiter=",")
-x_t = pts[:, 0]
-y_t = pts[:, 1]
-
-N = len(x_t)                     # override N from the CSV length
+x_t, y_t = pts[:, 0], pts[:, 1]
+N = len(x_t)                     
 t = np.linspace(0, 1, N, endpoint=False)
 
 # Shift/scale x/y as needed to fit your cam height budget
-x_t = (x_t - np.mean(x_t)) / np.std(x_t)         
-y_t = (y_t - np.mean(y_t)) / np.std(y_t)  
-y_t -= np.min(y_t)
+avg = SCALE * (np.mean(x_t + y_t)) / 2
+x_t = (x_t - np.mean(x_t)) / avg
+y_t = (y_t - np.min(y_t)) / avg  
 print(x_t)
 print(y_t)
+exit
 
 # Make radius always valid
 r_t = R + y_t          # always >= R
@@ -63,7 +65,7 @@ theta = 2 * np.pi * t
 # Prism dims per spec
 l   = 2 * r_g + P                # axial width      (x direction)
 w   = 2 * r_g                    # tangential width  (y direction)
-h_t = r_t + 0.6 * r_g            # radial height     (z direction, per-sample)
+h_t = r_t + COVERAGE * r_g            # radial height     (z direction, per-sample)
 
 # ── Grid ──────────────────────────────────────────────────────────────────────
 lim = r_t.max() + r_g + 2.0
