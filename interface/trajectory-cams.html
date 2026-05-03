@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Music Box Trajectory Generator</title>
+<title>Drawing Generator</title>
 <style>
-@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=DM+Mono:wght@300;400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap");
 
 :root {
   --sky: #aaddf5;
@@ -15,6 +15,7 @@
   --purple: #7c3aed;
   --red: #d14444;
   --blue: #2f6dd6;
+  --optimized: #059669;
   --panel: rgba(255,255,255,0.48);
   --panel-border: rgba(255,255,255,0.75);
 }
@@ -24,7 +25,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 
 body {
   background: var(--sky);
-  font-family: "DM Mono", monospace;
+  font-family: "Orbitron", "Space Mono", monospace;
   user-select: none;
 }
 
@@ -68,7 +69,7 @@ body {
   border: 1.5px solid rgba(44,49,112,0.2);
   background: rgba(255,255,255,0.7);
   color: var(--navy);
-  font-family: "DM Mono", monospace;
+  font-family: "Orbitron", "Space Mono", monospace;
   font-size: 11.5px;
   cursor: pointer;
   transition: background .13s, border-color .13s;
@@ -100,8 +101,8 @@ body {
   pointer-events: auto;
 }
 .title-block h1 {
-  font-family: "Playfair Display", serif;
-  font-style: italic;
+  font-family: "Orbitron", "Space Mono", monospace;
+  
   font-size: 1.75rem;
   color: #1a1f4e;
   line-height: 1.15;
@@ -113,8 +114,8 @@ body {
   background: var(--cream);
   border: 1.5px solid rgba(44,49,112,0.18);
   color: #555; font-size: 12px; cursor: pointer;
-  font-family: "Playfair Display", serif;
-  font-style: italic; font-weight: 700;
+  font-family: "Orbitron", "Space Mono", monospace;
+   font-weight: 700;
   margin-top: 8px;
   pointer-events: auto;
   transition: background .18s;
@@ -124,7 +125,7 @@ body {
 .sidebar {
   position: absolute;
   top: 14px; right: 14px; bottom: 14px;
-  width: 196px;
+  width: 308px;
   display: flex; flex-direction: column; gap: 11px;
   pointer-events: auto;
   overflow-y: auto;
@@ -142,7 +143,7 @@ body {
   flex-shrink: 0;
 }
 .panel h2 {
-  font-family: "Playfair Display", serif;
+  font-family: "Orbitron", "Space Mono", monospace;
   font-size: 1.15rem; color: #1a1f4e;
   margin-bottom: 10px;
 }
@@ -169,23 +170,26 @@ body {
   background: rgba(255,255,255,0.7);
   border: 1px solid rgba(44,49,112,0.15);
   border-radius: 8px;
-  font-family: "DM Mono", monospace; font-size: 11px;
+  font-family: "Orbitron", "Space Mono", monospace; font-size: 11px;
   color: var(--navy); cursor: pointer; text-align: left;
   transition: background .13s;
 }
-.tool-btn:hover { background: rgba(255,255,255,.95); }
+.tool-btn:hover:not(:disabled) { background: rgba(255,255,255,.95); }
+.tool-btn:disabled { opacity: 0.35; cursor: default; }
 .tool-btn.active  { background: var(--navy); color: #fff; }
 .tool-btn.running { background: #1a6a5a; color: #fff; animation: pulse .8s infinite; }
+.tool-btn.opt-btn { border-color: rgba(5,150,105,0.35); }
+.tool-btn.opt-btn:hover:not(:disabled) { background: rgba(5,150,105,0.1); }
+.tool-btn.opt-active { background: var(--optimized); color: #fff; border-color: var(--optimized); }
+
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
 
 .prog-wrap { height: 3px; border-radius: 2px; background: rgba(44,49,112,.14); overflow: hidden; margin-top: 8px; }
 .prog-bar  { height: 100%; background: var(--navy); width: 0; transition: width .12s; }
-.status-txt{ font-size: 10px; color: #4a5a7a; margin-top: 5px; font-style: italic; min-height: 13px; }
+.status-txt{ font-size: 10px; color: #4a5a7a; margin-top: 5px;  min-height: 13px; }
 
 .pts-slider-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: flex; align-items: center; gap: 10px;
   background: rgba(255,255,255,0.7);
   border: 1px solid rgba(44,49,112,0.15);
   border-radius: 8px;
@@ -194,53 +198,28 @@ body {
 }
 
 #speedSlider {
-  flex: 1;
-  min-width: 0;
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  cursor: pointer;
+  flex: 1; min-width: 0;
+  appearance: none; -webkit-appearance: none;
+  background: transparent; cursor: pointer;
 }
-
 #speedSlider::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(44,49,112,0.18);
+  height: 4px; border-radius: 999px; background: rgba(44,49,112,0.18);
 }
-
 #speedSlider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--navy);
-  border: 2px solid white;
-  margin-top: -5px;
-  box-shadow: 0 1px 4px rgba(44,49,112,0.18);
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--navy); border: 2px solid white;
+  margin-top: -5px; box-shadow: 0 1px 4px rgba(44,49,112,0.18);
 }
-
 #speedSlider::-moz-range-track {
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(44,49,112,0.18);
+  height: 4px; border-radius: 999px; background: rgba(44,49,112,0.18);
 }
-
 #speedSlider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--navy);
-  border: 2px solid white;
-  box-shadow: 0 1px 4px rgba(44,49,112,0.18);
-  cursor: pointer;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--navy); border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(44,49,112,0.18); cursor: pointer;
 }
-
-.speed-readout {
-  flex: 0 0 42px;
-  text-align: right;
-  font-size: 12px;
-}
+.speed-readout { flex: 0 0 42px; text-align: right; font-size: 12px; }
 
 .leg-row { display: flex; align-items: center; gap: 7px; font-size: 10px; color: #4a5a7a; padding: 2px 0; }
 .leg-line { width: 18px; height: 2.5px; border-radius: 2px; flex-shrink: 0; }
@@ -265,15 +244,12 @@ body {
 .figure-card.active { border-color: var(--purple); }
 .figure-icon { font-size: 20px; flex-shrink: 0; }
 
+/* ─── Presets overlay ─── */
 #presetsOverlay {
-  display: none;
-  position: fixed; inset: 0;
+  display: none; position: fixed; inset: 0;
   background: rgba(30,40,80,0.45);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  z-index: 300;
-  align-items: center;
-  justify-content: center;
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  z-index: 300; align-items: center; justify-content: center;
 }
 #presetsOverlay.open { display: flex; }
 
@@ -284,26 +260,23 @@ body {
   padding: 22px 24px 24px;
   box-shadow: 0 12px 48px rgba(44,49,112,0.18);
   width: min(640px, 92vw);
-  max-height: 82vh;
-  overflow-y: auto;
+  max-height: 82vh; overflow-y: auto;
 }
 .presets-header {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 16px;
 }
 .presets-header h3 {
-  font-family: "Playfair Display", serif;
-  font-style: italic; font-size: 1.2rem; color: #1a1f4e;
+  font-family: "Orbitron", "Space Mono", monospace;
+   font-size: 1.2rem; color: #1a1f4e;
 }
 .presets-close {
-  width: 30px; height: 30px;
-  border-radius: 50%;
+  width: 30px; height: 30px; border-radius: 50%;
   border: 1.5px solid rgba(44,49,112,0.2);
   background: rgba(255,255,255,0.8);
   color: #555; font-size: 15px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background .14s;
-  flex-shrink: 0;
+  transition: background .14s; flex-shrink: 0;
 }
 .presets-close:hover { background: #fff; color: #222; }
 
@@ -315,10 +288,8 @@ body {
 .preset-card {
   background: rgba(255,255,255,0.85);
   border: 1.5px solid rgba(44,49,112,0.12);
-  border-radius: 10px;
-  padding: 10px 8px 8px;
-  cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  border-radius: 10px; padding: 10px 8px 8px;
+  cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 7px;
   transition: border-color .16s, box-shadow .16s, transform .1s;
 }
 .preset-card:hover {
@@ -329,22 +300,232 @@ body {
 .preset-card canvas { display: block; border-radius: 5px; }
 .preset-name { font-size: 10px; color: #4a5a7a; }
 
+/* ─── Cam 3D Modal ─── */
+#camModal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(20,25,60,0.75);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  z-index: 500; align-items: center; justify-content: center;
+}
+#camModal.open { display: flex; }
+
+.cam-modal-box {
+  background: rgba(18,22,48,0.97);
+  border: 1.5px solid rgba(100,120,200,0.3);
+  border-radius: 20px;
+  width: min(960px, 94vw);
+  height: min(680px, 88vh);
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(10,15,40,0.6);
+  overflow: hidden;
+}
+.cam-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 22px 12px;
+  border-bottom: 1px solid rgba(100,120,200,0.2);
+}
+.cam-modal-header h3 {
+  font-family: "Orbitron", "Space Mono", monospace;
+   font-size: 1.15rem;
+  color: #c8d8f8;
+}
+.cam-modal-close {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid rgba(100,120,200,0.3);
+  background: rgba(100,120,200,0.12);
+  color: #aab; font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .14s;
+}
+.cam-modal-close:hover { background: rgba(100,120,200,0.28); color: #fff; }
+
+.cam-modal-body {
+  flex: 1; display: flex; gap: 0; overflow: hidden;
+}
+
+#camWebGL {
+  flex: 1; display: block;
+  border-radius: 0 0 0 20px;
+}
+
+.cam-sidebar {
+  width: 220px; flex-shrink: 0;
+  padding: 16px 14px;
+  border-left: 1px solid rgba(100,120,200,0.18);
+  display: flex; flex-direction: column; gap: 14px;
+  overflow-y: auto; scrollbar-width: none;
+  background: rgba(14,18,40,0.5);
+}
+.cam-sidebar::-webkit-scrollbar { display: none; }
+
+.cam-section-title {
+  font-size: 9px; letter-spacing: 0.12em;
+  color: rgba(150,170,220,0.7);
+  text-transform: uppercase; margin-bottom: 6px;
+}
+
+.cam-param-row {
+  display: flex; flex-direction: column; gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(100,120,200,0.1);
+}
+.cam-param-row:last-child { border: none; padding: 0; }
+.cam-param-label {
+  font-size: 10px; color: rgba(180,200,240,0.75);
+  display: flex; justify-content: space-between;
+}
+.cam-param-val { color: #7dd3fc; }
+.cam-param-row input[type=range] {
+  width: 100%; appearance: none; -webkit-appearance: none;
+  background: transparent; cursor: pointer;
+}
+.cam-param-row input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 2px; background: rgba(100,120,200,0.25);
+}
+.cam-param-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+  background: #7dd3fc; border: 1.5px solid rgba(14,18,40,0.8);
+  margin-top: -4.5px;
+}
+
+.cam-btn {
+  width: 100%; padding: 8px 10px;
+  border-radius: 9px; border: none;
+  font-family: "Orbitron", "Space Mono", monospace; font-size: 11px;
+  cursor: pointer; transition: all .15s;
+}
+.cam-btn-primary {
+  background: linear-gradient(135deg, #2d3170, #4a3fa0);
+  color: #e8f0ff;
+  box-shadow: 0 2px 10px rgba(44,49,112,0.35);
+}
+.cam-btn-primary:hover { filter: brightness(1.15); }
+.cam-btn-secondary {
+  background: rgba(100,120,200,0.15);
+  border: 1px solid rgba(100,120,200,0.28);
+  color: #aac;
+}
+.cam-btn-secondary:hover { background: rgba(100,120,200,0.25); color: #dde; }
+
+.cam-info-row {
+  display: flex; justify-content: space-between;
+  font-size: 9px; color: rgba(150,170,220,0.65);
+  padding: 2px 0;
+}
+.cam-info-val { color: rgba(200,220,255,0.85); }
+
+.cam-rotate-hint {
+  font-size: 9px; color: rgba(150,170,220,0.45); text-align: center;
+  margin-top: auto; padding-top: 6px; 
+}
+
+/* ─── Help overlay ─── */
 #helpOverlay {
   display: none; position: fixed; inset: 0;
   background: rgba(60,60,60,0.85);
   z-index: 400; cursor: pointer;
 }
-#helpOverlay.open { display: block; }
+#helpOverlay.open { display: block; pointer-events: auto; }
 .help-tip {
   position: absolute; color: #e8e8e8;
-  font-size: 12px; font-family: "DM Mono", monospace;
+  font-size: 12px; font-family: "Orbitron", "Space Mono", monospace;
   line-height: 1.7; max-width: 180px;
 }
 .dismiss-hint {
   position: absolute; bottom: 24px; left: 0; right: 0;
   text-align: center; color: #aaa; font-size: 13px;
-  font-family: "Playfair Display", serif; font-style: italic;
+  font-family: "Orbitron", "Space Mono", monospace; 
 }
+
+
+/* ─── Top-bar optimization controls ─── */
+.tb-opt-wrap {
+  display: flex; align-items: center; gap: 8px;
+  margin-left: 4px; color: var(--navy);
+  font-size: 10.5px;
+}
+.tb-optimize, .tb-accept {
+  padding: 6px 13px; border-radius: 8px;
+  border: 1.5px solid rgba(44,49,112,0.2);
+  background: rgba(255,255,255,0.7);
+  color: var(--navy);
+  font-family: "Orbitron", "Space Mono", monospace; font-size: 11px;
+  cursor: pointer; transition: background .13s, color .13s, border-color .13s;
+}
+.tb-optimize:hover:not(:disabled), .tb-accept:hover:not(:disabled) { background: rgba(255,255,255,.96); }
+.tb-optimize.running { background: #1a6a5a; color: #fff; animation: pulse .8s infinite; }
+.tb-optimize.opt-active { background: var(--optimized); color: #fff; border-color: var(--optimized); }
+.tb-accept:disabled, .tb-optimize:disabled { opacity: .35; cursor: default; }
+.tb-fit { display: flex; align-items: center; gap: 6px; }
+#fitSlider { width: 118px; appearance: none; -webkit-appearance: none; background: transparent; cursor: pointer; }
+#fitSlider::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: rgba(44,49,112,0.18); }
+#fitSlider::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--optimized); border: 2px solid white; margin-top: -4.5px; }
+#fitSlider::-moz-range-track { height: 4px; border-radius: 999px; background: rgba(44,49,112,0.18); }
+#fitSlider::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: var(--optimized); border: 2px solid white; }
+#fitVal { min-width: 36px; color: #1a6a5a; text-align: right; }
+
+/* ─── Embedded cam preview panel ─── */
+.sidebar { width: 308px; transition: width .18s ease; }
+.sidebar.wide { width: 520px; }
+.cam-embed-panel { min-height: 380px; }
+.cam-panel-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.cam-panel-actions { display:flex; gap:6px; }
+.cam-mini-btn {
+  padding: 5px 9px; border-radius: 8px;
+  border: 1px solid rgba(44,49,112,0.15);
+  background: rgba(255,255,255,0.75);
+  color: var(--navy); cursor: pointer;
+  font-family: "Orbitron", "Space Mono", monospace; font-size: 9.5px;
+}
+.cam-mini-btn:hover { background: rgba(255,255,255,0.95); }
+#camWebGL {
+  width: 100%; height: 240px; display: block;
+  border-radius: 10px;
+  background: rgba(10,14,40,0.97);
+  border: 1px solid rgba(44,49,112,0.18);
+  cursor: grab;
+}
+.sidebar.wide #camWebGL { height: 360px; }
+#camWebGL:active { cursor: grabbing; }
+.cam-embed-controls { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.cam-section-title {
+  font-size: 8.5px; letter-spacing: 0.12em;
+  color: #5a6a8a; text-transform: uppercase; margin: 2px 0 2px;
+}
+.cam-param-row { display: flex; flex-direction: column; gap: 3px; }
+.cam-param-label { font-size: 9px; color: #4a5a7a; display: flex; justify-content: space-between; gap:8px; }
+.cam-param-val { color: #1a6a5a; }
+.cam-param-row input[type=range] { width: 100%; appearance: none; -webkit-appearance: none; background: transparent; cursor: pointer; }
+.cam-param-row input[type=range]::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: rgba(44,49,112,0.18); }
+.cam-param-row input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%; background: var(--navy); border: 1.5px solid white; margin-top: -4px; }
+.cam-param-row input[type=range]::-moz-range-track { height: 3px; border-radius: 2px; background: rgba(44,49,112,0.18); }
+.cam-param-row input[type=range]::-moz-range-thumb { width: 11px; height: 11px; border-radius: 50%; background: var(--navy); border: 1.5px solid white; }
+.cam-readout-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.cam-info-row { display: flex; justify-content: space-between; font-size: 8.5px; color: #5a6a8a; padding: 1px 0; gap:8px; }
+.cam-info-val { color: #1a2a3a; text-align:right; }
+.cam-note { font-size: 8.5px; color:#5a6a8a; line-height:1.45; }
+.cam-badge { display:inline-flex; align-items:center; justify-content:center; padding:4px 8px; border-radius:999px; font-size:8.5px; letter-spacing:.08em; text-transform:uppercase; border:1px solid rgba(44,49,112,.15); }
+.cam-badge.safe { background: rgba(5,150,105,0.12); color:#047857; }
+.cam-badge.caution { background: rgba(245,158,11,0.14); color:#b45309; }
+.cam-badge.risky { background: rgba(220,38,38,0.12); color:#b91c1c; }
+.cam-rotate-hint { font-size: 8.5px; color: #6a7895; text-align: center; }
+
+/* ─── Curve toggle strip ─── *//* ─── Curve toggle strip ─── */
+.curve-toggle {
+  display: flex; gap: 0;
+  background: rgba(255,255,255,0.65);
+  border: 1px solid rgba(44,49,112,0.15);
+  border-radius: 8px; overflow: hidden;
+}
+.curve-toggle-btn {
+  flex: 1; padding: 5px 4px;
+  border: none; background: transparent;
+  font-family: "Orbitron", "Space Mono", monospace; font-size: 9px;
+  cursor: pointer; color: #5a6a8a;
+  transition: background .12s, color .12s;
+}
+.curve-toggle-btn.on { background: var(--navy); color: #fff; }
+.curve-toggle-btn.on.opt { background: var(--optimized); }
 </style>
 </head>
 <body>
@@ -354,19 +535,30 @@ body {
   <button class="tb-btn" id="tbRedo" title="Redo (Ctrl+Y)" disabled>↪</button>
   <div class="tb-sep"></div>
   <button class="tb-presets" id="tbPresets">presets</button>
+  <div class="tb-sep"></div>
+  <div class="tb-opt-wrap">
+    <button class="tb-optimize" id="toolOptimize">optimize</button>
+    <label class="tb-fit" title="Lower fit smooths more; higher fit stays closer to the original spline.">
+      fit
+      <input type="range" id="fitSlider" min="0.30" max="1.50" step="0.05" value="1.00"/>
+      <span id="fitVal">1.00×</span>
+    </label>
+    <button class="tb-accept" id="acceptOpt" disabled>use optimized</button>
+    <button class="tb-accept" id="rejectOpt" disabled>discard</button>
+  </div>
 </div>
 
 <canvas id="cv"></canvas>
 
 <div class="float-ui">
   <div class="title-block">
-    <h1>Music Box<br/>Trajectory<br/>Generator</h1>
+    <h1>Drawing<br/>Generator</h1>
     <button class="help-btn" id="helpBtn">?</button>
   </div>
 
   <div class="sidebar">
     <div class="panel">
-      <h2>Tools</h2>
+      <h2>Controls</h2>
       <div class="tools-list">
         <div class="pts-label">number of points</div>
         <div class="pts-row">
@@ -374,57 +566,88 @@ body {
           <span class="pts-val" id="ptCount">6</span>
           <button class="pts-btn" id="btnPlus">+</button>
         </div>
-        <button class="tool-btn" id="toolReset">↺ Reset Shape</button>
-        <button class="tool-btn" id="toolSynth">✦ Generate Cams</button>
-        <button class="tool-btn" id="downloadCams">⬇ Download CSV</button>
-        <button class="tool-btn" id="downloadSTL">⬇ Download STL</button>
-        <button class="tool-btn" id="toolAnimate">▶ Animate</button>
+        <button class="tool-btn" id="toolReset">↺ Reset Drawing</button>
+
+        <!-- curve overlay toggle — shown only after optimize -->
+        <div id="curveToggleWrap" style="display:none">
+          <div class="pts-label">show curve</div>
+          <div class="curve-toggle">
+            <button class="curve-toggle-btn on" id="toggleOrig">original</button>
+            <button class="curve-toggle-btn opt" id="toggleOpt">optimized</button>
+            <button class="curve-toggle-btn" id="toggleBoth">both</button>
+          </div>
+        </div>
+        <button class="tool-btn" id="downloadSTL">⬇ Export Full 3D Cam STL</button>
+        <button class="tool-btn" id="toolAnimate">▶ Animate Drawing</button>
         <div class="pts-label">trajectory speed</div>
         <div class="pts-slider-wrap">
-          <input
-            type="range"
-            id="speedSlider"
-            min="0.02"
-            max="1.00"
-            step="0.02"
-            value="0.20"
-          />
+          <input type="range" id="speedSlider" min="0.02" max="1.00" step="0.02" value="0.20"/>
           <span class="pts-val speed-readout" id="speedVal">1.0x</span>
         </div>
       </div>
       <div class="prog-wrap"><div class="prog-bar" id="pb"></div></div>
-      <div class="status-txt" id="statusTxt">drag points · then generate cams</div>
+      <div class="status-txt" id="statusTxt">drag points · export the final cam</div>
     </div>
 
     <div class="panel">
       <h2 style="font-size:.95rem;margin-bottom:7px">Legend</h2>
       <div class="leg-row"><div class="leg-line" style="background:var(--navy)"></div>Target trajectory</div>
-      <div class="leg-row"><div class="leg-line" style="background:rgba(124,58,237,0.75)"></div>Cam-reproduced path</div>
-      <div class="leg-row"><div class="leg-line" style="background:var(--orange)"></div>Animated target dot</div>
-      <div class="leg-row"><div class="leg-line" style="background:var(--purple)"></div>Animated cam dot</div>
+      <div class="leg-row"><div class="leg-line" style="background:rgba(5,150,105,0.85)"></div>Optimized curve</div>
+      <div class="leg-row"><div class="leg-line" style="background:var(--orange)"></div>Animated drawing</div>
     </div>
 
-    <div class="panel" id="paramsPanel" style="display:none">
-      <h2 style="font-size:.95rem;margin-bottom:6px">Cam Parameters</h2>
-      <div class="params-list" id="paramsList"></div>
-    </div>
+    <div class="panel" id="paramsPanel" style="display:none"></div>
 
-    <div class="panel figures-panel">
-      <h2>Figures</h2>
-      <div class="figures-grid">
-        <div class="figure-card active" data-fig="dancer"><span class="figure-icon">🩰</span>dancer</div>
-        <div class="figure-card" data-fig="bear"><span class="figure-icon">🐻</span>bear</div>
-        <div class="figure-card" data-fig="star"><span class="figure-icon">⭐</span>star</div>
-        <div class="figure-card" data-fig="robot"><span class="figure-icon">🤖</span>robot</div>
-        <div class="figure-card" data-fig="cat"><span class="figure-icon">🐱</span>cat</div>
-        <div class="figure-card" data-fig="butterfly"><span class="figure-icon">🦋</span>butterfly</div>
-        <div class="figure-card" data-fig="crown"><span class="figure-icon">👑</span>crown</div>
-        <div class="figure-card" data-fig="bird"><span class="figure-icon">🐦</span>bird</div>
+    <div class="panel cam-embed-panel" id="camEmbedPanel">
+      <div class="cam-panel-head">
+        <h2 style="font-size:.95rem;margin-bottom:0">3D Cam</h2>
+        <div class="cam-panel-actions">
+          <button class="cam-mini-btn" id="toggleCamWide">widen</button>
+          <button class="cam-mini-btn" id="camResetView">reset view</button>
+        </div>
+      </div>
+      <canvas id="camWebGL"></canvas>
+      <div class="cam-embed-controls">
+        <div>
+          <div class="cam-section-title">Adjustable</div>
+          <div class="cam-param-row">
+            <div class="cam-param-label">Lip cover <span class="cam-param-val" id="lbLip">0.65</span></div>
+            <input type="range" id="slLip" min="0.01" max="0.95" step="0.01" value="0.65"/>
+          </div>
+        </div>
+
+        <div>
+          <div class="cam-section-title">Locked parameters</div>
+          <div class="cam-readout-grid">
+            <div class="cam-info-row">Groove radius <span class="cam-info-val" id="lbGroove">2.20 mm</span></div>
+            <div class="cam-info-row">Track width <span class="cam-info-val" id="lbTrack">7.04 mm</span></div>
+            <div class="cam-info-row">Axial travel <span class="cam-info-val" id="lbAxial">12.33 mm</span></div>
+            <div class="cam-info-row">Radius min <span class="cam-info-val" id="lbRmin">16.73 mm</span></div>
+            <div class="cam-info-row">Radius max <span class="cam-info-val" id="lbRmax">27.74 mm</span></div>
+            <div class="cam-info-row">Axis length <span class="cam-info-val" id="infoaxis">46.33 mm</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="cam-section-title">Manufacturability</div>
+          <div class="cam-info-row">Ball diameter <span class="cam-info-val" id="infoball">—</span></div>
+          <div class="cam-info-row">Slot opening <span class="cam-info-val" id="infoslot">—</span></div>
+          <div class="cam-info-row">Lip overhang <span class="cam-info-val" id="infolip">—</span></div>
+          <div class="cam-info-row">Min bend radius <span class="cam-info-val" id="infobend">—</span></div>
+          <div class="cam-info-row">Bend / groove ratio <span class="cam-info-val" id="inforatio">—</span></div>
+          <div class="cam-info-row">Status <span class="cam-info-val" id="infostatusWrap"><span class="cam-badge" id="infostatus">—</span></span></div>
+          <div class="cam-note" id="manufactureNote">Using the arc-length-sampled groove and groove radius as a proxy for tight turns.</div>
+        </div>
+
+        <div class="cam-rotate-hint">Drag to rotate · scroll to zoom</div>
       </div>
     </div>
+
+    
   </div>
 </div>
 
+<!-- Presets -->
 <div id="presetsOverlay">
   <div class="presets-box">
     <div class="presets-header">
@@ -435,18 +658,19 @@ body {
   </div>
 </div>
 
+<!-- Help -->
 <div id="helpOverlay">
   <div class="help-tip" id="tipCircle" style="text-align:center;max-width:220px;font-size:13px">
     Click and drag the white points<br/>to reshape your trajectory
   </div>
   <div class="help-tip" style="bottom:14%;left:4%">
-    Two synchronized cams<br/>preview shown here
+    Draw a closed curve<br/>for the final cam
   </div>
   <div class="help-tip" style="top:10%;right:210px;text-align:right">
-    Generate cams to encode<br/>the spline as x(θ), y(θ)
+    The 3D cam updates<br/>from the current spline
   </div>
   <div class="help-tip" style="top:10%;right:22px;text-align:right">
-    Pick a figure<br/>from this panel
+    The pencil follows<br/>your drawing
   </div>
   <div class="dismiss-hint">Click anywhere to dismiss</div>
 </div>
@@ -454,9 +678,9 @@ body {
 <script>
 'use strict';
 
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // CANVAS
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 const cv  = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 const dpr = window.devicePixelRatio || 1;
@@ -477,9 +701,9 @@ function setupCanvas() {
   R0 = Math.min(W, H) * 0.34;
 }
 
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // STATE
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 let nodes     = [];
 let numPts    = 6;
 let dragging  = null;
@@ -491,7 +715,11 @@ let splineDirty = true;
 let _splineData = null;
 let _splinePts  = [];
 let animSpeed = 0.2;
-let selectedEmoji = '🩰';
+const selectedEmoji = '✏️';
+
+// Optimized curve state
+let optimizedNodes = null;   // array of {x,y} on the optimized curve (sampled pts)
+let curveMode = 'original';  // 'original' | 'optimized' | 'both'
 
 function resetNodes() {
   nodes = [];
@@ -501,11 +729,14 @@ function resetNodes() {
   }
   splineDirty = true;
   _splinePts = [];
+  optimizedNodes = null;
+  curveMode = 'original';
+  updateCurveToggleUI();
 }
 
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // PERIODIC CUBIC HERMITE SPLINE
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function solveHermiteTangents(f) {
   const n = f.length;
   const rhs = new Float64Array(n);
@@ -601,8 +832,6 @@ function getCachedSplinePts(sps) {
 }
 
 function sampleTargetPts(N) {
-  // Arc-length reparametrization: distribute N samples uniformly by distance
-  // around the full loop, not uniformly in spline parameter space.
   const DENSE = 2000;
   const densePts = new Array(DENSE);
   const denseT   = new Array(DENSE);
@@ -610,8 +839,6 @@ function sampleTargetPts(N) {
     denseT[i]   = i / DENSE;
     densePts[i] = evalSpline(denseT[i]);
   }
-
-  // Cumulative arc length (closed loop — wrap last→first)
   const cumLen = new Float64Array(DENSE + 1);
   for (let i = 1; i < DENSE; i++) {
     const dx = densePts[i].x - densePts[i - 1].x;
@@ -635,9 +862,118 @@ function sampleTargetPts(N) {
   return out;
 }
 
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// SPLINE OPTIMIZER  (port of optimize_splines.py)
+// Periodic cubic Hermite, minimizes curvature + length + fidelity
+// Uses simple gradient descent (no scipy here), iterative refinement
+// ═══════════════════════════════════════════════════════
+
+// We work directly in the space of node positions,
+// applying a Laplacian smoothing pass + arc-length redistribution
+// iteratively, trading off fidelity vs smoothness.
+
+function optimizeCurve(opts) {
+  // opts: { alpha (smooth), beta (fidelity), gamma (length), iterations }
+  const { alpha = 0.15, beta = 0.80, gamma = 0.05, iterations = 80 } = opts || {};
+
+  // Start from current nodes
+  let pts = nodes.map(n => ({ x: n.x, y: n.y }));
+  const N = pts.length;
+  if (N < 3) return pts;
+
+  // Reference: densely sample original spline (ground truth for fidelity)
+  const REF_N = 300;
+  const ref = [];
+  for (let i = 0; i < REF_N; i++) ref.push(evalSpline(i / REF_N));
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const t = iter / iterations; // goes 0→1
+
+    // Compute gradient descent step
+    const newPts = pts.map((p, i) => {
+      const prev = pts[(i - 1 + N) % N];
+      const next = pts[(i + 1) % N];
+
+      // Laplacian (smoothness) force: pull toward midpoint of neighbors
+      const lapX = ((prev.x + next.x) / 2 - p.x);
+      const lapY = ((prev.y + next.y) / 2 - p.y);
+
+      // Length (shortening) force: pull toward midpoint of arc
+      const midX = (prev.x + next.x) / 2;
+      const midY = (prev.y + next.y) / 2;
+      const lenX = (midX - p.x) * 0.5;
+      const lenY = (midY - p.y) * 0.5;
+
+      // Fidelity: find nearest reference point and pull toward it
+      // Sample spline at this node's parameter
+      const tParam = i / N;
+      const refIdx = Math.round(tParam * REF_N) % REF_N;
+      const refPt  = ref[refIdx];
+      const fidX = (refPt.x - p.x);
+      const fidY = (refPt.y - p.y);
+
+      const stepSize = 0.35;
+      return {
+        x: p.x + stepSize * (alpha * lapX + gamma * lenX + beta * fidX),
+        y: p.y + stepSize * (alpha * lapY + gamma * lenY + beta * fidY)
+      };
+    });
+
+    pts = newPts;
+  }
+
+  return pts;
+}
+
+// Sample the optimized node positions through a NEW Hermite spline
+function sampleOptimizedCurve(optNodes, sps) {
+  sps = sps || 120;
+  const n = optNodes.length;
+  const px = Float64Array.from(optNodes, nd => nd.x);
+  const py = Float64Array.from(optNodes, nd => nd.y);
+  const kx = solveHermiteTangents(px);
+  const ky = solveHermiteTangents(py);
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const ip1 = (i + 1) % n;
+    const dfx = px[ip1] - px[i];
+    const dfy = py[ip1] - py[i];
+    const abxi = { a: kx[i] - dfx, b: -kx[ip1] + dfx };
+    const abyi = { a: ky[i] - dfy, b: -ky[ip1] + dfy };
+    for (let s = 0; s < sps; s++) {
+      const tau = s / sps;
+      pts.push({
+        x: hermQ(tau, px[i], px[ip1], abxi.a, abxi.b),
+        y: hermQ(tau, py[i], py[ip1], abyi.a, abyi.b)
+      });
+    }
+  }
+  return pts;
+}
+
+// Render optimized-node spline at parameter t
+function evalOptimizedSpline(t) {
+  if (!optimizedNodes) return evalSpline(t);
+  const n = optimizedNodes.length;
+  const px = Float64Array.from(optimizedNodes, nd => nd.x);
+  const py = Float64Array.from(optimizedNodes, nd => nd.y);
+  const kx = solveHermiteTangents(px);
+  const ky = solveHermiteTangents(py);
+  const ft = ((t % 1) + 1) % 1;
+  const segF = ft * n;
+  const i = Math.floor(segF) % n;
+  const tau = segF - Math.floor(segF);
+  const ip1 = (i + 1) % n;
+  const dfx = px[ip1] - px[i]; const dfy = py[ip1] - py[i];
+  return {
+    x: hermQ(tau, px[i], px[ip1], kx[i] - dfx, -kx[ip1] + dfx),
+    y: hermQ(tau, py[i], py[ip1], ky[i] - dfy, -ky[ip1] + dfy)
+  };
+}
+
+// ═══════════════════════════════════════════════════════
 // CAM SYSTEM
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 function interpPeriodic(arr, tau) {
@@ -650,7 +986,16 @@ function interpPeriodic(arr, tau) {
 }
 
 function buildCamSystem(sampleCount = 480) {
-  const pts = sampleTargetPts(sampleCount);
+  // Use active curve (optimized if available + mode !== original)
+  const useOpt = (optimizedNodes && curveMode !== 'original');
+
+  let pts;
+  if (useOpt) {
+    pts = sampleOptimizedSourcePts(sampleCount);
+  } else {
+    pts = sampleTargetPts(sampleCount);
+  }
+
   if (!pts || pts.length < 20) return null;
 
   const xs = pts.map(p => p.x);
@@ -675,17 +1020,34 @@ function buildCamSystem(sampleCount = 480) {
   if (Math.min(...camX) <= 0 || Math.min(...camY) <= 0) return null;
 
   const theta = xs.map((_, i) => (i / xs.length) * Math.PI * 2);
+  return { theta, xs, ys, xCenter, yCenter, xDisp, yDisp, camX, camY, baseRadius, gain, n: xs.length };
+}
 
-  return {
-    theta,
-    xs, ys,
-    xCenter, yCenter,
-    xDisp, yDisp,
-    camX, camY,
-    baseRadius,
-    gain,
-    n: xs.length
-  };
+function sampleOptimizedSourcePts(N) {
+  // Arc-length resample of the optimized hermite spline
+  const DENSE = 2000;
+  const densePts = [];
+  for (let i = 0; i < DENSE; i++) densePts.push(evalOptimizedSpline(i / DENSE));
+  const cumLen = new Float64Array(DENSE + 1);
+  for (let i = 1; i < DENSE; i++) {
+    const dx = densePts[i].x - densePts[i-1].x;
+    const dy = densePts[i].y - densePts[i-1].y;
+    cumLen[i] = cumLen[i-1] + Math.sqrt(dx*dx + dy*dy);
+  }
+  const dx0 = densePts[0].x - densePts[DENSE-1].x;
+  const dy0 = densePts[0].y - densePts[DENSE-1].y;
+  cumLen[DENSE] = cumLen[DENSE-1] + Math.sqrt(dx0*dx0 + dy0*dy0);
+  const totalLen = cumLen[DENSE];
+  const out = [];
+  let j = 0;
+  for (let i = 0; i < N; i++) {
+    const target = (i / N) * totalLen;
+    while (j < DENSE - 1 && cumLen[j+1] < target) j++;
+    const span = cumLen[j+1] - cumLen[j];
+    const frac = span > 0 ? (target - cumLen[j]) / span : 0;
+    out.push(evalOptimizedSpline(j / DENSE + frac * (1 / DENSE)));
+  }
+  return out;
 }
 
 function camStateAt(sys, tau) {
@@ -697,180 +1059,69 @@ function camStateAt(sys, tau) {
   return { x, y, rx, ry, theta };
 }
 
-function camToPolygon(theta, radii) {
-  return radii.map((r, i) => ({
-    x: r * Math.cos(theta[i]),
-    y: r * Math.sin(theta[i])
-  }));
-}
-
-function polygonToSVGPath(pts) {
-  if (!pts.length) return "";
-  return pts.map((p, i) =>
-    `${i === 0 ? "M" : "L"} ${p.x.toFixed(3)} ${p.y.toFixed(3)}`
-  ).join(" ") + " Z";
-}
-
-function downloadCamSVG(theta, radii, filename = "cam.svg", holeRadius = 3, scale = 0.2) {
-  const pts = camToPolygon(theta, radii).map(p => ({
-    x: p.x * scale,
-    y: p.y * scale
-  }));
-
-  const scaledHoleRadius = holeRadius * 1;
-  const d = polygonToSVGPath(pts);
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of pts) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
-  }
-
-  const pad = 10 * scale;
-  minX -= pad;
-  minY -= pad;
-  maxX += pad;
-  maxY += pad;
-
-  const w = maxX - minX;
-  const h = maxY - minY;
-
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="${minX} ${minY} ${w} ${h}"
-     width="${w}mm"
-     height="${h}mm">
-  <path d="${d}" fill="none" stroke="red" stroke-width="${0.1}"/>
-  <circle cx="0" cy="0" r="${scaledHoleRadius}" fill="none" stroke="red" stroke-width="${0.1}"/>
-</svg>`;
-
-  const blob = new Blob([svg], { type: "image/svg+xml" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ══════════════════════════════════════════════════════
-// SYNTHESIS → CAM GENERATION
-// ══════════════════════════════════════════════════════
-async function generateCams() {
-  const btn = document.getElementById('toolSynth');
-  btn.textContent = '⟳ Generating…';
-  btn.classList.add('running');
-  setStatus('sampling spline…');
-  stopAnim();
-  camSystem = null;
-  document.getElementById('pb').style.width = '0%';
-  draw();
-
-  await new Promise(r => setTimeout(r, 0));
-  document.getElementById('pb').style.width = '28%';
-
-  const target = sampleTargetPts(420);
-  if (!target || target.length < 20) {
-    setStatus('failed to sample target path');
-    btn.textContent = '✦ Generate Cams';
-    btn.classList.remove('running');
-    return;
-  }
-
-  setStatus('encoding x(θ) and y(θ) into cams…');
-  await new Promise(r => setTimeout(r, 0));
-  document.getElementById('pb').style.width = '62%';
-
-  const sys = buildCamSystem(480);
-  if (!sys) {
-    setStatus('failed — try reshaping');
-    btn.textContent = '✦ Generate Cams';
-    btn.classList.remove('running');
-    return;
-  }
-
-  camSystem = sys;
-  document.getElementById('pb').style.width = '100%';
-  renderParams();
-  setStatus('cams generated');
-  btn.textContent = '✦ Generate Cams';
-  btn.classList.remove('running');
-  document.getElementById('paramsPanel').style.display = 'block';
-  draw();
-}
-
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // DRAWING
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 function draw() {
   ctx.clearRect(0, 0, W, H);
-  drawGrid();
-  drawTargetSpline();
-  if (camSystem) {
-    drawCamReproducedPath();
-    drawCamPreview();
-  }
+
+  const showOrig = (curveMode === 'original' || curveMode === 'both');
+  const showOpt  = (curveMode === 'optimized' || curveMode === 'both') && optimizedNodes;
+
+  if (showOrig) drawTargetSpline(curveMode === 'both' ? 0.35 : 1.0);
+  if (showOpt)  drawOptimizedSpline(1.0);
   drawNodes();
   if (animating) drawAnimDots();
 }
 
 function drawGrid() {
-  const step = 52;
-  ctx.save();
-  ctx.strokeStyle = 'rgba(100,140,180,0.12)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += step) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-  }
-  for (let y = 0; y < H; y += step) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-  }
-  ctx.restore();
 }
 
-function drawTargetSpline() {
+function drawTargetSpline(alpha) {
   if (splineDirty) { _splinePts = []; computeSplineData(); }
   const pts = getCachedSplinePts(90);
   if (pts.length < 2) return;
   ctx.save();
+  ctx.globalAlpha = alpha != null ? alpha : 1.0;
   ctx.strokeStyle = 'rgba(44,49,112,0.10)';
   ctx.lineWidth = 10;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.beginPath();
   pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
-  ctx.closePath();
-  ctx.stroke();
+  ctx.closePath(); ctx.stroke();
 
   ctx.strokeStyle = '#2d3170';
   ctx.lineWidth = 2.8;
-  ctx.shadowColor = 'rgba(44,49,112,0.18)';
-  ctx.shadowBlur = 8;
+  ctx.shadowColor = 'rgba(44,49,112,0.18)'; ctx.shadowBlur = 8;
   ctx.beginPath();
   pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
-  ctx.closePath();
-  ctx.stroke();
+  ctx.closePath(); ctx.stroke();
+  ctx.restore();
+}
+
+function drawOptimizedSpline(alpha) {
+  if (!optimizedNodes) return;
+  const pts = sampleOptimizedCurve(optimizedNodes, 120);
+  if (pts.length < 2) return;
+  ctx.save();
+  ctx.globalAlpha = alpha != null ? alpha : 1.0;
+  ctx.strokeStyle = 'rgba(5,150,105,0.18)';
+  ctx.lineWidth = 10;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+  ctx.closePath(); ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(5,150,105,0.92)';
+  ctx.lineWidth = 2.8;
+  ctx.shadowColor = 'rgba(5,150,105,0.28)'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+  ctx.closePath(); ctx.stroke();
   ctx.restore();
 }
 
 function drawCamReproducedPath() {
-  const pts = camSystem.xs.map((x, i) => ({ x, y: camSystem.ys[i] }));
-  if (pts.length < 2) return;
-
-  ctx.save();
-  ctx.strokeStyle = 'rgba(124,58,237,0.72)';
-  ctx.lineWidth = 2.6;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.shadowColor = 'rgba(124,58,237,0.22)';
-  ctx.shadowBlur = 6;
-  ctx.beginPath();
-  pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
-  ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
 }
 
 function drawMiniPathPanel(x, y, w, h, pts, currentPt) {
@@ -878,709 +1129,1085 @@ function drawMiniPathPanel(x, y, w, h, pts, currentPt) {
   const pad = 10;
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const sc = Math.min((w - 2*pad) / Math.max(maxX - minX, 1e-9), (h - 2*pad) / Math.max(maxY - minY, 1e-9)) * 0.95;
-  const ox = x + (w - (maxX - minX) * sc) / 2 - minX * sc;
-  const oy = y + (h - (maxY - minY) * sc) / 2 - minY * sc;
-  const T = p => ({ x: p.x * sc + ox, y: p.y * sc + oy });
+  const sc = Math.min((w-2*pad)/Math.max(maxX-minX,1e-9),(h-2*pad)/Math.max(maxY-minY,1e-9))*0.95;
+  const ox = x+(w-(maxX-minX)*sc)/2-minX*sc;
+  const oy = y+(h-(maxY-minY)*sc)/2-minY*sc;
+  const T = p => ({x:p.x*sc+ox, y:p.y*sc+oy});
 
   ctx.save();
   ctx.strokeStyle = 'rgba(124,58,237,0.16)';
   ctx.lineWidth = 1.1;
   ctx.beginPath();
-  pts.forEach((p, i) => {
-    const t = T(p);
-    i ? ctx.lineTo(t.x, t.y) : ctx.moveTo(t.x, t.y);
-  });
-  ctx.closePath();
-  ctx.stroke();
+  pts.forEach((p,i) => { const t=T(p); i?ctx.lineTo(t.x,t.y):ctx.moveTo(t.x,t.y); });
+  ctx.closePath(); ctx.stroke();
 
   const cp = T(currentPt);
-  ctx.beginPath();
-  ctx.arc(cp.x, cp.y, 4.7, 0, Math.PI * 2);
+  ctx.beginPath(); ctx.arc(cp.x,cp.y,4.7,0,Math.PI*2);
   ctx.fillStyle = '#7c3aed';
-  ctx.shadowColor = 'rgba(124,58,237,0.45)';
-  ctx.shadowBlur = 6;
-  ctx.fill();
-  ctx.restore();
+  ctx.shadowColor = 'rgba(124,58,237,0.45)'; ctx.shadowBlur = 6;
+  ctx.fill(); ctx.restore();
 
   ctx.save();
   ctx.fillStyle = 'rgba(44,49,112,0.45)';
   ctx.font = '10px DM Mono,monospace';
-  ctx.fillText('Path', x + 4, y + h + 13);
+  ctx.fillText('Path', x+4, y+h+13);
   ctx.restore();
 }
 
 function drawCamSubpanel(x, y, w, h, radii, thetaNow, color, label) {
-  const TWO_PI = Math.PI * 2;
-  const cx = x + w / 2;
-  const cy = y + h / 2;
+  const TWO_PI = Math.PI*2;
+  const cx = x+w/2, cy = y+h/2;
   const maxR = Math.max(...radii);
-  const sc = 0.42 * Math.min(w, h) / Math.max(maxR, 1e-9);
-
-  // follower is a vertical slider sitting at the top
+  const sc = 0.42*Math.min(w,h)/Math.max(maxR,1e-9);
   const followerRadius = 5.2;
-  const shaftTopY = y + 8;
-  const topDir = -Math.PI / 2;
-
-  // IMPORTANT:
-  // radii[] is a phase-indexed lift signal.
-  // We want phase 0 to be at the top when thetaNow = 0,
-  // and then the cam rotates by -thetaNow underneath the fixed follower.
+  const shaftTopY = y+8;
+  const topDir = -Math.PI/2;
   const phaseOffset = topDir;
-
-  const rNow = interpPeriodic(radii, thetaNow / TWO_PI);
-  const camContactX = cx;
-  const camContactY = cy - sc * rNow;
-
-  const followerX = cx;
-  const followerY = camContactY - followerRadius;
+  const rNow = interpPeriodic(radii, thetaNow/TWO_PI);
+  const camContactY = cy-sc*rNow;
+  const followerY = camContactY-followerRadius;
 
   ctx.save();
-
-  // reference circle
   ctx.strokeStyle = 'rgba(44,49,112,0.16)';
   ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.arc(cx, cy, sc * maxR, 0, TWO_PI);
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,sc*maxR,0,TWO_PI); ctx.stroke();
 
-  // rotating cam
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.8;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.beginPath();
-
-  radii.forEach((r, i) => {
-    const localTh = (i / radii.length) * TWO_PI + phaseOffset;
-    const worldTh = localTh - thetaNow;
-    const px = cx + sc * r * Math.cos(worldTh);
-    const py = cy + sc * r * Math.sin(worldTh);
-    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  radii.forEach((r,i) => {
+    const localTh = (i/radii.length)*TWO_PI+phaseOffset;
+    const worldTh = localTh-thetaNow;
+    const px = cx+sc*r*Math.cos(worldTh);
+    const py = cy+sc*r*Math.sin(worldTh);
+    i?ctx.lineTo(px,py):ctx.moveTo(px,py);
   });
+  ctx.closePath(); ctx.stroke();
 
-  ctx.closePath();
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,3.0,0,TWO_PI);
+  ctx.fillStyle='#fff'; ctx.fill();
+  ctx.strokeStyle='#333'; ctx.lineWidth=0.8; ctx.stroke();
 
-  // hub
-  ctx.beginPath();
-  ctx.arc(cx, cy, 3.0, 0, TWO_PI);
-  ctx.fillStyle = '#fff';
-  ctx.fill();
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
+  ctx.strokeStyle='rgba(44,49,112,0.48)'; ctx.lineWidth=1.4;
+  ctx.beginPath(); ctx.moveTo(cx,shaftTopY); ctx.lineTo(cx,followerY-followerRadius); ctx.stroke();
 
-  // follower stem
-  ctx.strokeStyle = 'rgba(44,49,112,0.48)';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(cx, shaftTopY);
-  ctx.lineTo(cx, followerY - followerRadius);
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,followerY,followerRadius,0,TWO_PI);
+  ctx.fillStyle='#fff'; ctx.shadowColor='rgba(44,49,112,0.18)'; ctx.shadowBlur=5; ctx.fill();
+  ctx.strokeStyle='#333'; ctx.lineWidth=1.0; ctx.stroke(); ctx.shadowBlur=0;
 
-  // follower roller
-  ctx.beginPath();
-  ctx.arc(followerX, followerY, followerRadius, 0, TWO_PI);
-  ctx.fillStyle = '#fff';
-  ctx.shadowColor = 'rgba(44,49,112,0.18)';
-  ctx.shadowBlur = 5;
-  ctx.fill();
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  // contact marker
-  ctx.beginPath();
-  ctx.arc(camContactX, camContactY, 2.2, 0, TWO_PI);
-  ctx.fillStyle = color;
-  ctx.fill();
-
-  ctx.restore();
+  ctx.beginPath(); ctx.arc(cx,camContactY,2.2,0,TWO_PI);
+  ctx.fillStyle=color; ctx.fill(); ctx.restore();
 
   ctx.save();
-  ctx.fillStyle = 'rgba(44,49,112,0.45)';
-  ctx.font = '10px DM Mono,monospace';
-  ctx.fillText(label, x + 4, y + h + 13);
+  ctx.fillStyle='rgba(44,49,112,0.45)';
+  ctx.font='10px DM Mono,monospace';
+  ctx.fillText(label,x+4,y+h+13);
   ctx.restore();
 }
 
 function drawCamPreview() {
-  const bx = 18, by = H * 0.64, bw = W * 0.26, bh = H * 0.31;
-
-  ctx.save();
-  ctx.fillStyle = 'rgba(255,255,255,0.36)';
-  ctx.strokeStyle = 'rgba(255,255,255,0.58)';
-  ctx.lineWidth = 1.4;
-  roundRect(ctx, bx, by, bw, bh, 14);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-
-  const state = camStateAt(camSystem, animT);
-  const margin = 12;
-  const topH = bh * 0.58;
-  const gap = 8;
-  const subW = (bw - 2 * margin - gap) / 2;
-  const subH = topH - 20;
-
-  drawCamSubpanel(bx + margin, by + 10, subW, subH, camSystem.camX, state.theta, '#d14444', 'pX');
-  drawCamSubpanel(bx + margin + subW + gap, by + 10, subW, subH, camSystem.camY, state.theta, '#2f6dd6', 'Cam Y');
-
-  const pathY = by + topH + 4;
-  const pathH = bh - (topH + 18);
-  const pts = camSystem.xs.map((x, i) => ({ x, y: camSystem.ys[i] }));
-  drawMiniPathPanel(bx + margin, pathY, bw - 2 * margin, pathH, pts, { x: state.x, y: state.y });
-
-  ctx.save();
-  ctx.fillStyle = 'rgba(44,49,112,0.45)';
-  ctx.font = '10px DM Mono,monospace';
-  ctx.fillText('Cams', bx + 4, by + bh + 14);
-  ctx.restore();
 }
 
-function roundRect(c, x, y, w, h, r) {
+function roundRect(c,x,y,w,h,r){
   c.beginPath();
-  c.moveTo(x + r, y);
-  c.lineTo(x + w - r, y);
-  c.quadraticCurveTo(x + w, y, x + w, y + r);
-  c.lineTo(x + w, y + h - r);
-  c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  c.lineTo(x + r, y + h);
-  c.quadraticCurveTo(x, y + h, x, y + h - r);
-  c.lineTo(x, y + r);
-  c.quadraticCurveTo(x, y, x + r, y);
-  c.closePath();
+  c.moveTo(x+r,y); c.lineTo(x+w-r,y);
+  c.quadraticCurveTo(x+w,y,x+w,y+r); c.lineTo(x+w,y+h-r);
+  c.quadraticCurveTo(x+w,y+h,x+w-r,y+h); c.lineTo(x+r,y+h);
+  c.quadraticCurveTo(x,y+h,x,y+h-r); c.lineTo(x,y+r);
+  c.quadraticCurveTo(x,y,x+r,y); c.closePath();
 }
 
 function drawAnimDots() {
-  const sp = evalSpline(animT);
+  const useCurve = (optimizedNodes && curveMode !== 'original');
+  const sp = useCurve ? evalOptimizedSpline(animT) : evalSpline(animT);
 
   ctx.save();
-  ctx.font = '30px serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(196,92,42,0.35)';
-  ctx.shadowBlur = 10;
+  ctx.font='30px sans-serif';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.shadowColor='rgba(196,92,42,0.35)';
+  ctx.shadowBlur=10;
   ctx.fillText(selectedEmoji, sp.x, sp.y);
   ctx.restore();
-
-  if (camSystem) {
-    const s = camStateAt(camSystem, animT);
-
-    ctx.save();
-    ctx.font = '30px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.globalAlpha = 0.55;
-    ctx.shadowColor = 'rgba(124,58,237,0.35)';
-    ctx.shadowBlur = 10;
-    ctx.fillText(selectedEmoji, s.x, s.y);
-    ctx.restore();
-  }
 }
 
 function drawNodes() {
-  nodes.forEach((n, i) => {
+  nodes.forEach((n,i) => {
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(n.x, n.y, 9, 0, Math.PI * 2);
-    ctx.fillStyle = dragging === i ? '#aaddf5' : '#ffffff';
-    ctx.strokeStyle = '#2d3170';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = 'rgba(44,49,112,0.15)';
-    ctx.shadowBlur = 5;
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    ctx.beginPath(); ctx.arc(n.x,n.y,9,0,Math.PI*2);
+    ctx.fillStyle = dragging===i ? '#aaddf5' : '#ffffff';
+    ctx.strokeStyle='#2d3170'; ctx.lineWidth=2;
+    ctx.shadowColor='rgba(44,49,112,0.15)'; ctx.shadowBlur=5;
+    ctx.fill(); ctx.stroke(); ctx.restore();
   });
 }
 
-// ══════════════════════════════════════════════════════
-// PARAMS
-// ══════════════════════════════════════════════════════
-function renderParams() {
-  if (!camSystem) return;
+// ═══════════════════════════════════════════════════════
+// CURVE TOGGLE UI
+// ═══════════════════════════════════════════════════════
+function updateCurveToggleUI() {
+  const wrap = document.getElementById('curveToggleWrap');
+  wrap.style.display = optimizedNodes ? 'block' : 'none';
 
-  const maxRx = Math.max(...camSystem.camX);
-  const minRx = Math.min(...camSystem.camX);
-  const maxRy = Math.max(...camSystem.camY);
-  const minRy = Math.min(...camSystem.camY);
-
-  const f = v => v.toFixed(1);
-
-  document.getElementById('paramsList').innerHTML = `
-    <div class="pr"><span class="pk">x center</span><span class="pv red">${f(camSystem.xCenter)}</span></div>
-    <div class="pr"><span class="pk">y center</span><span class="pv red">${f(camSystem.yCenter)}</span></div>
-    <div class="pr"><span class="pk">base radius</span><span class="pv blu">${f(camSystem.baseRadius)}</span></div>
-    <div class="pr"><span class="pk">gain</span><span class="pv blu">${camSystem.gain.toFixed(2)}</span></div>
-    <div class="pr"><span class="pk">cam X min</span><span class="pv grn">${f(minRx)}</span></div>
-    <div class="pr"><span class="pk">cam X max</span><span class="pv grn">${f(maxRx)}</span></div>
-    <div class="pr"><span class="pk">cam Y min</span><span class="pv pur">${f(minRy)}</span></div>
-    <div class="pr"><span class="pk">cam Y max</span><span class="pv pur">${f(maxRy)}</span></div>
-    <div class="pr"><span class="pk">samples</span><span class="pv">${camSystem.n}</span></div>
-  `;
-}
-const speedSlider = document.getElementById('speedSlider');
-
-function updateSpeedLabel() {
-  document.getElementById('speedVal').textContent = (5 * animSpeed).toFixed(1) + 'x';
-  speedSlider.value = animSpeed.toFixed(2);
-}
-
-speedSlider.addEventListener('input', () => {
-  animSpeed = parseFloat(speedSlider.value);
-  updateSpeedLabel();
-});
-
-function setStatus(m) {
-  document.getElementById('statusTxt').textContent = m;
-}
-
-// ══════════════════════════════════════════════════════
-// ANIMATION
-// ══════════════════════════════════════════════════════
-function startAnim() {
-  animating = true;
-  document.getElementById('toolAnimate').textContent = '⏹ Stop';
-  document.getElementById('toolAnimate').classList.add('active');
-  let last = null;
-
-  function step(ts) {
-    if (!animating) return;
-    if (last === null) last = ts;
-    const dt = Math.min((ts - last) / 1000, 0.05);
-    last = ts;
-    animT = (animT + dt * animSpeed) % 1;
-    draw();
-    animFrame = requestAnimationFrame(step);
-  }
-  animFrame = requestAnimationFrame(step);
-}
-
-function stopAnim() {
-  animating = false;
-  document.getElementById('toolAnimate').textContent = '▶ Animate';
-  document.getElementById('toolAnimate').classList.remove('active');
-  if (animFrame) {
-    cancelAnimationFrame(animFrame);
-    animFrame = null;
+  ['toggleOrig','toggleOpt','toggleBoth'].forEach((id,idx) => {
+    const modes = ['original','optimized','both'];
+    const btn = document.getElementById(id);
+    btn.classList.toggle('on', curveMode === modes[idx]);
+  });
+  document.getElementById('toggleOpt').classList.toggle('opt', curveMode === 'optimized');
+  if (!optimizedNodes) {
+    document.getElementById('acceptOpt').disabled = true;
+    document.getElementById('rejectOpt').disabled = true;
+    document.getElementById('toolOptimize').classList.remove('opt-active');
   }
 }
 
-// ══════════════════════════════════════════════════════
-// UNDO / REDO
-// ══════════════════════════════════════════════════════
-const _hist = [];
-let _histIdx = -1;
-
-function pushHistory() {
-  _hist.splice(_histIdx + 1);
-  _hist.push(nodes.map(n => ({ x: n.x, y: n.y })));
-  if (_hist.length > 40) _hist.shift();
-  _histIdx = _hist.length - 1;
-  updateUndoRedo();
-}
-
-function restoreHistory(idx) {
-  nodes = _hist[idx].map(n => ({ x: n.x, y: n.y }));
-  numPts = nodes.length;
-  document.getElementById('ptCount').textContent = numPts;
-  splineDirty = true;
-  _splinePts = [];
-  camSystem = null;
-  document.getElementById('paramsPanel').style.display = 'none';
-  updateUndoRedo();
+function setCurveMode(mode) {
+  curveMode = mode;
+  updateCurveToggleUI();
+  rebuildGeneratedCam(false);
+  scheduleCamPreviewRebuild();
   draw();
 }
 
-function undo() { if (_histIdx > 0) restoreHistory(--_histIdx); }
-function redo() { if (_histIdx < _hist.length - 1) restoreHistory(++_histIdx); }
+document.getElementById('toggleOrig').addEventListener('click',()=>setCurveMode('original'));
+document.getElementById('toggleOpt').addEventListener('click',()=>setCurveMode('optimized'));
+document.getElementById('toggleBoth').addEventListener('click',()=>setCurveMode('both'));
 
-function updateUndoRedo() {
-  document.getElementById('tbUndo').disabled = _histIdx <= 0;
-  document.getElementById('tbRedo').disabled = _histIdx >= _hist.length - 1;
+// ═══════════════════════════════════════════════════════
+// PARAMS PANEL
+// ═══════════════════════════════════════════════════════
+function renderParams() {
 }
 
-document.getElementById('tbUndo').addEventListener('click', undo);
-document.getElementById('tbRedo').addEventListener('click', redo);
-window.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+const speedSlider = document.getElementById('speedSlider');
+function updateSpeedLabel(){
+  document.getElementById('speedVal').textContent=(5*animSpeed).toFixed(1)+'x';
+  speedSlider.value=animSpeed.toFixed(2);
+}
+speedSlider.addEventListener('input',()=>{ animSpeed=parseFloat(speedSlider.value); updateSpeedLabel(); });
+
+const fitSlider = document.getElementById('fitSlider');
+function updateFitLabel(){ document.getElementById('fitVal').textContent=parseFloat(fitSlider.value).toFixed(2)+'×'; }
+fitSlider.addEventListener('input',()=>{ updateFitLabel(); if(optimizedNodes) runOptimize(); });
+
+function setStatus(m){ document.getElementById('statusTxt').textContent=m; }
+function setProgress(p){ document.getElementById('pb').style.width=p+'%'; }
+
+// ═══════════════════════════════════════════════════════
+// LIVE CAM REBUILD
+// ═══════════════════════════════════════════════════════
+let camRebuildTimer = null;
+function rebuildGeneratedCam(showStatus=false) {
+  camSystem = buildCamSystem(480);
+  const paramsPanel=document.getElementById('paramsPanel');
+  if (paramsPanel) paramsPanel.style.display='none';
+  if (!camSystem) {
+    setProgress(0);
+    if (showStatus) setStatus('cam rebuild failed — try reshaping');
+    return;
+  }
+  setProgress(100);
+  if (showStatus) setStatus('cam updated ✓');
+  scheduleCamPreviewRebuild();
+}
+function scheduleCamSystemRebuild(showStatus=false) {
+  if (camRebuildTimer) clearTimeout(camRebuildTimer);
+  camRebuildTimer = setTimeout(() => {
+    rebuildGeneratedCam(showStatus);
+    draw();
+  }, 80);
+}
+
+// ═══════════════════════════════════════════════════════
+// OPTIMIZE CURVE
+// ═══════════════════════════════════════════════════════
+async function runOptimize() {
+  const btn=document.getElementById('toolOptimize');
+  const fitMult=parseFloat(document.getElementById('fitSlider').value);
+  btn.textContent='optimizing…'; btn.classList.add('running');
+  setStatus(`optimizing curve · fit ${fitMult.toFixed(2)}×`); setProgress(0);
+  await tick(); setProgress(20);
+
+  await new Promise(resolve => {
+    setTimeout(() => {
+      try {
+        const smoothBoost = 1 / fitMult;
+        optimizedNodes = optimizeCurve({
+          alpha: 0.25 * smoothBoost,
+          beta: 0.70 * fitMult,
+          gamma: 0.05 * smoothBoost,
+          iterations: 140
+        });
+        setProgress(85);
+      } catch(e) {
+        console.error(e);
+        optimizedNodes = null;
+      }
+      resolve();
+    }, 10);
+  });
+
+  await tick(); setProgress(100);
+  if (optimizedNodes) {
+    curveMode = 'both';
+    document.getElementById('acceptOpt').disabled=false;
+    document.getElementById('rejectOpt').disabled=false;
+    btn.classList.add('opt-active');
+    setStatus('optimized preview ready — accept to replace spline');
+    rebuildGeneratedCam(false);
+  } else {
+    setStatus('optimization failed');
+  }
+  updateCurveToggleUI();
+  btn.textContent='optimize';
+  btn.classList.remove('running');
+  draw();
+}
+
+function acceptOptimizedCurve() {
+  if (!optimizedNodes) return;
+  nodes = optimizedNodes.map(p => ({x:p.x, y:p.y}));
+  numPts = nodes.length;
+  document.getElementById('ptCount').textContent=numPts;
+  optimizedNodes = null;
+  curveMode = 'original';
+  splineDirty = true; _splinePts = [];
+  document.getElementById('acceptOpt').disabled=true;
+  document.getElementById('rejectOpt').disabled=true;
+  document.getElementById('toolOptimize').classList.remove('opt-active');
+  updateCurveToggleUI();
+  pushHistory();
+  rebuildGeneratedCam(true);
+  draw();
+}
+
+function rejectOptimizedCurve() {
+  optimizedNodes = null;
+  curveMode = 'original';
+  document.getElementById('acceptOpt').disabled=true;
+  document.getElementById('rejectOpt').disabled=true;
+  document.getElementById('toolOptimize').classList.remove('opt-active');
+  updateCurveToggleUI();
+  rebuildGeneratedCam(false);
+  setStatus('optimized preview discarded');
+  draw();
+}
+
+// ═══════════════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════════════
+function startAnim(){
+  animating=true;
+  document.getElementById('toolAnimate').textContent='⏹ Stop';
+  document.getElementById('toolAnimate').classList.add('active');
+  let last=null;
+  function step(ts){
+    if(!animating)return;
+    if(last===null)last=ts;
+    const dt=Math.min((ts-last)/1000,0.05); last=ts;
+    animT=(animT+dt*animSpeed)%1;
+    draw(); animFrame=requestAnimationFrame(step);
+  }
+  animFrame=requestAnimationFrame(step);
+}
+function stopAnim(){
+  animating=false;
+  document.getElementById('toolAnimate').textContent='▶ Animate';
+  document.getElementById('toolAnimate').classList.remove('active');
+  if(animFrame){ cancelAnimationFrame(animFrame); animFrame=null; }
+}
+
+// ═══════════════════════════════════════════════════════
+// UNDO / REDO
+// ═══════════════════════════════════════════════════════
+const _hist=[];
+let _histIdx=-1;
+
+function pushHistory(){
+  _hist.splice(_histIdx+1);
+  _hist.push(nodes.map(n=>({x:n.x,y:n.y})));
+  if(_hist.length>40)_hist.shift();
+  _histIdx=_hist.length-1;
+  updateUndoRedo();
+}
+function restoreHistory(idx){
+  nodes=_hist[idx].map(n=>({x:n.x,y:n.y}));
+  numPts=nodes.length;
+  document.getElementById('ptCount').textContent=numPts;
+  splineDirty=true; _splinePts=[];
+  camSystem=null; optimizedNodes=null; curveMode='original';
+  document.getElementById('paramsPanel').style.display='none';
+  document.getElementById('toolOptimize').disabled=false;
+  scheduleCamPreviewRebuild();
+  document.getElementById('toolOptimize').classList.remove('opt-active');
+  updateCurveToggleUI(); updateUndoRedo(); rebuildGeneratedCam(false); scheduleCamPreviewRebuild(); draw();
+}
+function undo(){ if(_histIdx>0) restoreHistory(--_histIdx); }
+function redo(){ if(_histIdx<_hist.length-1) restoreHistory(++_histIdx); }
+function updateUndoRedo(){
+  document.getElementById('tbUndo').disabled=_histIdx<=0;
+  document.getElementById('tbRedo').disabled=_histIdx>=_hist.length-1;
+}
+
+document.getElementById('tbUndo').addEventListener('click',undo);
+document.getElementById('tbRedo').addEventListener('click',redo);
+window.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.shiftKey){e.preventDefault();undo();}
+  if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.key==='z'&&e.shiftKey))){e.preventDefault();redo();}
 });
 
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // PRESETS
-// ══════════════════════════════════════════════════════
-const PRESETS = [
-  {name:'circle',     nodes:[[0, -1], [0.707, -0.707], [1, 0], [0.707, 0.707], [0, 1], [-0.707, 0.707], [-1, 0], [-0.707, -0.707]] },
-  {name:'infinity', nodes:[[0,0],[1.5/3,-1/3],[3/3,0],[1.5/3,1/3],[0,0],[-1.5/3,-1/3],[-3/3,0],[-1.5/3,1/3]] },
-  {name:'triple loop', nodes:[[0,-1/3], [1/3,0], [2/3,1/3], [3/3,0], [2/3, -1/3], [1/3,0], [0,1/3], [-1/3, 0], [-2/3,-1/3], [-3/3,0], [-2/3,1/3], [-1/3,0]] },
-  {name:'star', nodes:[[0,-1], [0.224,-0.309], [0.951,-0.309], [0.363,0.118], [0.588,0.809], [0,0.382], [-0.588,0.809], [-0.363,0.118], [-0.951,-0.309], [-0.224,-0.309]] }
+// ═══════════════════════════════════════════════════════
+const PRESETS=[
+  {name:'circle',     nodes:[[0,-1],[0.707,-0.707],[1,0],[0.707,0.707],[0,1],[-0.707,0.707],[-1,0],[-0.707,-0.707]]},
+  {name:'infinity',   nodes:[[0,0],[1.5/3,-1/3],[3/3,0],[1.5/3,1/3],[0,0],[-1.5/3,-1/3],[-3/3,0],[-1.5/3,1/3]]},
+  {name:'triple loop',nodes:[[0,-1/3],[1/3,0],[2/3,1/3],[3/3,0],[2/3,-1/3],[1/3,0],[0,1/3],[-1/3,0],[-2/3,-1/3],[-3/3,0],[-2/3,1/3],[-1/3,0]]},
+  {name:'star',       nodes:[[0,-1],[0.224,-0.309],[0.951,-0.309],[0.363,0.118],[0.588,0.809],[0,0.382],[-0.588,0.809],[-0.363,0.118],[-0.951,-0.309],[-0.224,-0.309]]}
 ];
 
-function renderThumb(presetNodes, size) {
-  const oc = document.createElement('canvas');
-  const d = window.devicePixelRatio || 1;
-  oc.width = oc.height = size * d;
-  oc.style.width = oc.style.height = size + 'px';
-  const c2 = oc.getContext('2d');
-  c2.scale(d, d);
-
-  const cx = size / 2, cy = size / 2, r = size * 0.38;
-  const toP = ([nx, ny]) => ({ x: cx + nx * r, y: cy + ny * r });
-  const pn = presetNodes.map(toP);
-  const nn = pn.length;
-  const px = Float64Array.from(pn, p => p.x), py = Float64Array.from(pn, p => p.y);
-  const kx = solveHermiteTangents(px), ky = solveHermiteTangents(py);
-  const abx = [], aby = [];
-
-  for (let i = 0; i < nn; i++) {
-    const ip1 = (i + 1) % nn, dfx = px[ip1] - px[i], dfy = py[ip1] - py[i];
-    abx.push({ a: kx[i] - dfx, b: -kx[ip1] + dfx });
-    aby.push({ a: ky[i] - dfy, b: -ky[ip1] + dfy });
+function renderThumb(presetNodes,size){
+  const oc=document.createElement('canvas');
+  const d=window.devicePixelRatio||1;
+  oc.width=oc.height=size*d; oc.style.width=oc.style.height=size+'px';
+  const c2=oc.getContext('2d'); c2.scale(d,d);
+  const cx=size/2,cy=size/2,r=size*0.38;
+  const toP=([nx,ny])=>({x:cx+nx*r,y:cy+ny*r});
+  const pn=presetNodes.map(toP); const nn=pn.length;
+  const px=Float64Array.from(pn,p=>p.x),py=Float64Array.from(pn,p=>p.y);
+  const kx=solveHermiteTangents(px),ky=solveHermiteTangents(py);
+  const abx=[],aby=[];
+  for(let i=0;i<nn;i++){
+    const ip1=(i+1)%nn,dfx=px[ip1]-px[i],dfy=py[ip1]-py[i];
+    abx.push({a:kx[i]-dfx,b:-kx[ip1]+dfx});
+    aby.push({a:ky[i]-dfy,b:-ky[ip1]+dfy});
   }
-
-  const pts = [];
-  for (let i = 0; i < nn; i++) {
-    const ip1 = (i + 1) % nn;
-    for (let s = 0; s < 40; s++) {
-      const tau = s / 40;
-      pts.push({
-        x: hermQ(tau, px[i], px[ip1], abx[i].a, abx[i].b),
-        y: hermQ(tau, py[i], py[ip1], aby[i].a, aby[i].b)
-      });
+  const pts=[];
+  for(let i=0;i<nn;i++){
+    const ip1=(i+1)%nn;
+    for(let s=0;s<40;s++){
+      const tau=s/40;
+      pts.push({x:hermQ(tau,px[i],px[ip1],abx[i].a,abx[i].b),y:hermQ(tau,py[i],py[ip1],aby[i].a,aby[i].b)});
     }
   }
-
-  c2.strokeStyle = '#2d3170';
-  c2.lineWidth = 2;
-  c2.lineJoin = 'round';
-  c2.lineCap = 'round';
-  c2.shadowColor = 'rgba(44,49,112,0.2)';
-  c2.shadowBlur = 3;
-  c2.beginPath();
-  pts.forEach((p, i) => i ? c2.lineTo(p.x, p.y) : c2.moveTo(p.x, p.y));
-  c2.closePath();
-  c2.stroke();
-
-  pn.forEach(p => {
-    c2.beginPath();
-    c2.arc(p.x, p.y, 3, 0, Math.PI * 2);
-    c2.fillStyle = '#fff';
-    c2.fill();
-    c2.strokeStyle = '#2d3170';
-    c2.lineWidth = 1.2;
-    c2.stroke();
+  c2.strokeStyle='#2d3170'; c2.lineWidth=2;
+  c2.lineJoin='round'; c2.lineCap='round';
+  c2.shadowColor='rgba(44,49,112,0.2)'; c2.shadowBlur=3;
+  c2.beginPath(); pts.forEach((p,i)=>i?c2.lineTo(p.x,p.y):c2.moveTo(p.x,p.y));
+  c2.closePath(); c2.stroke();
+  pn.forEach(p=>{
+    c2.beginPath(); c2.arc(p.x,p.y,3,0,Math.PI*2);
+    c2.fillStyle='#fff'; c2.fill();
+    c2.strokeStyle='#2d3170'; c2.lineWidth=1.2; c2.stroke();
   });
   return oc;
 }
 
-function buildPresetsGrid() {
-  const grid = document.getElementById('presetsGrid');
-  grid.innerHTML = '';
-  PRESETS.forEach(preset => {
-    const card = document.createElement('div');
-    card.className = 'preset-card';
-    card.appendChild(renderThumb(preset.nodes, 152));
-    const lbl = document.createElement('div');
-    lbl.className = 'preset-name';
-    lbl.textContent = preset.name;
+function buildPresetsGrid(){
+  const grid=document.getElementById('presetsGrid'); grid.innerHTML='';
+  PRESETS.forEach(preset=>{
+    const card=document.createElement('div'); card.className='preset-card';
+    card.appendChild(renderThumb(preset.nodes,152));
+    const lbl=document.createElement('div'); lbl.className='preset-name'; lbl.textContent=preset.name;
     card.appendChild(lbl);
-    card.addEventListener('click', () => { applyPreset(preset); closePresets(); });
+    card.addEventListener('pointerdown', e => e.stopPropagation());
+    card.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      applyPreset(preset);
+      closePresets();
+    });
     grid.appendChild(card);
   });
 }
 
-function applyPreset(preset) {
-  const r = Math.min(W, H) * 0.34;
-  nodes = preset.nodes.map(([nx, ny]) => ({ x: CX + nx * r, y: CY + ny * r }));
-  numPts = nodes.length;
-  document.getElementById('ptCount').textContent = numPts;
-  splineDirty = true;
-  _splinePts = [];
-  camSystem = null;
-  document.getElementById('paramsPanel').style.display = 'none';
-  pushHistory();
-  draw();
+function applyPreset(preset){
+  const r=Math.min(W,H)*0.34;
+  nodes=preset.nodes.map(([nx,ny])=>({x:CX+nx*r,y:CY+ny*r}));
+  numPts=nodes.length;
+  document.getElementById('ptCount').textContent=numPts;
+  splineDirty=true; _splinePts=[];
+  camSystem=null; optimizedNodes=null; curveMode='original';
+  document.getElementById('paramsPanel').style.display='none';
+  document.getElementById('toolOptimize').disabled=false;
+  scheduleCamPreviewRebuild();
+  document.getElementById('toolOptimize').classList.remove('opt-active');
+  updateCurveToggleUI(); pushHistory(); rebuildGeneratedCam(false); scheduleCamPreviewRebuild(); draw();
 }
 
-function openPresets() {
-  buildPresetsGrid();
-  document.getElementById('presetsOverlay').classList.add('open');
-  document.getElementById('tbPresets').classList.add('open');
-}
-function closePresets() {
-  document.getElementById('presetsOverlay').classList.remove('open');
-  document.getElementById('tbPresets').classList.remove('open');
-}
+function openPresets(){ const h=document.getElementById('helpOverlay'); if(h) h.classList.remove('open'); buildPresetsGrid(); document.getElementById('presetsOverlay').classList.add('open'); document.getElementById('tbPresets').classList.add('open'); }
+function closePresets(){ document.getElementById('presetsOverlay').classList.remove('open'); document.getElementById('tbPresets').classList.remove('open'); }
 
-document.getElementById('tbPresets').addEventListener('click', () => {
-  document.getElementById('presetsOverlay').classList.contains('open') ? closePresets() : openPresets();
-});
-document.getElementById('presetsClose').addEventListener('click', closePresets);
-document.getElementById('presetsOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('presetsOverlay')) closePresets();
-});
+document.getElementById('tbPresets').addEventListener('click',()=>{ document.getElementById('presetsOverlay').classList.contains('open')?closePresets():openPresets(); });
+document.getElementById('presetsClose').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();closePresets();});
+document.getElementById('presetsOverlay').addEventListener('click',e=>{ if(e.target===document.getElementById('presetsOverlay'))closePresets(); });
 
-// ══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // INTERACTION
-// ══════════════════════════════════════════════════════
-function getPos(e) {
-  const rect = cv.getBoundingClientRect();
-  const t = e.touches ? e.touches[0] : e;
-  return { x: t.clientX - rect.left, y: t.clientY - rect.top };
-}
-function hitTest(pos) {
-  for (let i = 0; i < nodes.length; i++) {
-    if (Math.hypot(pos.x - nodes[i].x, pos.y - nodes[i].y) < 14) return i;
-  }
-  return null;
-}
+// ═══════════════════════════════════════════════════════
+function getPos(e){ const rect=cv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return{x:t.clientX-rect.left,y:t.clientY-rect.top}; }
+function hitTest(pos){ for(let i=0;i<nodes.length;i++)if(Math.hypot(pos.x-nodes[i].x,pos.y-nodes[i].y)<14)return i; return null; }
 
-cv.addEventListener('mousedown', e => {
-  const pos = getPos(e), hit = hitTest(pos);
-  if (hit !== null) { dragging = hit; cv.classList.add('grabbing'); }
+cv.addEventListener('mousedown',e=>{ const pos=getPos(e),hit=hitTest(pos); if(hit!==null){dragging=hit;cv.classList.add('grabbing');} });
+cv.addEventListener('mousemove',e=>{
+  const pos=getPos(e);
+  if(dragging!==null){
+    nodes[dragging]={x:pos.x,y:pos.y};
+    splineDirty=true; _splinePts=[];
+    camSystem=null; optimizedNodes=null; curveMode='original';
+    document.getElementById('paramsPanel').style.display='none';
+    document.getElementById('toolOptimize').disabled=false;
+  scheduleCamPreviewRebuild();
+    document.getElementById('toolOptimize').classList.remove('opt-active');
+    updateCurveToggleUI();
+    scheduleCamSystemRebuild(false);
+    if(!animating)draw();
+  } else { cv.className=hitTest(pos)!==null?'grab':''; }
 });
-cv.addEventListener('mousemove', e => {
-  const pos = getPos(e);
-  if (dragging !== null) {
-    nodes[dragging] = { x: pos.x, y: pos.y };
-    splineDirty = true;
-    _splinePts = [];
-    camSystem = null;
-    document.getElementById('paramsPanel').style.display = 'none';
-    if (!animating) draw();
-  } else {
-    cv.className = hitTest(pos) !== null ? 'grab' : '';
-  }
-});
-cv.addEventListener('mouseup', () => { if (dragging !== null) pushHistory(); dragging = null; cv.className = ''; });
-cv.addEventListener('mouseleave', () => { dragging = null; cv.className = ''; });
-
-cv.addEventListener('touchstart', e => {
+cv.addEventListener('mouseup',()=>{ if(dragging!==null)pushHistory(); dragging=null; cv.className=''; });
+cv.addEventListener('mouseleave',()=>{ dragging=null; cv.className=''; });
+cv.addEventListener('touchstart',e=>{ e.preventDefault(); const hit=hitTest(getPos(e)); if(hit!==null)dragging=hit; },{passive:false});
+cv.addEventListener('touchmove',e=>{
   e.preventDefault();
-  const hit = hitTest(getPos(e));
-  if (hit !== null) dragging = hit;
-}, { passive: false });
-cv.addEventListener('touchmove', e => {
-  e.preventDefault();
-  if (dragging !== null) {
-    const pos = getPos(e);
-    nodes[dragging] = { x: pos.x, y: pos.y };
-    splineDirty = true;
-    _splinePts = [];
-    camSystem = null;
-    document.getElementById('paramsPanel').style.display = 'none';
-    if (!animating) draw();
+  if(dragging!==null){
+    const pos=getPos(e); nodes[dragging]={x:pos.x,y:pos.y};
+    splineDirty=true; _splinePts=[]; camSystem=null; optimizedNodes=null; curveMode='original';
+    document.getElementById('paramsPanel').style.display='none';
+    document.getElementById('toolOptimize').disabled=false;
+  scheduleCamPreviewRebuild();
+    document.getElementById('toolOptimize').classList.remove('opt-active');
+    updateCurveToggleUI();
+    scheduleCamSystemRebuild(false);
+    if(!animating)draw();
   }
-}, { passive: false });
-cv.addEventListener('touchend', () => { if (dragging !== null) pushHistory(); dragging = null; });
+},{passive:false});
+cv.addEventListener('touchend',()=>{ if(dragging!==null)pushHistory(); dragging=null; });
 
-// Sidebar
-document.getElementById('toolReset').addEventListener('click', () => { resetNodes(); camSystem = null; document.getElementById('paramsPanel').style.display = 'none'; pushHistory(); draw(); });
-document.getElementById('toolSynth').addEventListener('click', generateCams);
-document.getElementById('downloadCams').addEventListener('click', () => {
-  if (!camSystem) {
-    setStatus('generate cams first');
-    return;
-  }
-
-  const sys = buildCamSystem(2000);
-  if (!sys) { setStatus('failed to build cams'); return; }
-
-  const rows = sys.xs.map((x, i) => `${x.toFixed(4)},${sys.ys[i].toFixed(4)}`);
-  const csv  = rows.join('\n');
-
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'trajectory.csv'; a.click();
-  URL.revokeObjectURL(url);
-
-  setStatus(`downloaded trajectory.csv (${sys.xs.length} points)`);
+// Sidebar buttons
+document.getElementById('toolReset').addEventListener('click',()=>{
+  resetNodes(); camSystem=null;
+  document.getElementById('paramsPanel').style.display='none';
+  document.getElementById('toolOptimize').disabled=false;
+  scheduleCamPreviewRebuild();
+  document.getElementById('toolOptimize').classList.remove('opt-active');
+  pushHistory(); rebuildGeneratedCam(false); scheduleCamPreviewRebuild(); draw();
 });
-document.getElementById('toolAnimate').addEventListener('click', () => animating ? stopAnim() : startAnim());
+document.getElementById('toolOptimize').addEventListener('click',runOptimize);
+document.getElementById('acceptOpt').addEventListener('click',acceptOptimizedCurve);
+document.getElementById('rejectOpt').addEventListener('click',rejectOptimizedCurve);
+document.getElementById('toolAnimate').addEventListener('click',()=>animating?stopAnim():startAnim());
 
-// ══════════════════════════════════════════════════════
-// STL GROOVE EXPORT
-// ══════════════════════════════════════════════════════
 
-const STL_R        = 25.0;
-const STL_TARGET   = 50.0;
-const STL_GROOVE_R = 2.5;
-const STL_N_PROF   = 24;
+// ═══════════════════════════════════════════════════════
+// GROOVE STL EXPORT (original)
+// ═══════════════════════════════════════════════════════
+const STL_R=25.0,STL_TARGET=50.0,STL_GROOVE_R=2.5,STL_N_PROF=24;
+function dot3(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+function cross3(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
+function sub3(a,b){return[a[0]-b[0],a[1]-b[1],a[2]-b[2]];}
+function scale3(s,v){return[s*v[0],s*v[1],s*v[2]];}
+function norm3(v){const l=Math.hypot(...v);return l>1e-12?v.map(x=>x/l):[1,0,0];}
 
-function dot3(a,b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
-function cross3(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
-function sub3(a,b){ return [a[0]-b[0],a[1]-b[1],a[2]-b[2]]; }
-function scale3(s,v){ return [s*v[0],s*v[1],s*v[2]]; }
-function norm3(v){ const l=Math.hypot(...v); return l>1e-12?v.map(x=>x/l):[1,0,0]; }
-
-function stlCoordMap(pts2d) {
-  const n = pts2d.length;
-  const xs = pts2d.map(p => p.x), ys = pts2d.map(p => p.y);
-  const midX = 0.5*(Math.max(...xs)+Math.min(...xs));
-  const minY = Math.min(...ys);
-  const xc = xs.map(v => v-midX);
-  const yc = ys.map(v => v+STL_R-minY);
-  return xc.map((x,i) => {
-    const th = 2*Math.PI*i/n;
-    return [x, yc[i]*Math.cos(th), yc[i]*Math.sin(th)];
+function stlCoordMap(pts2d){
+  const n=pts2d.length;
+  const xs=pts2d.map(p=>p.x),ys=pts2d.map(p=>p.y);
+  const midX=0.5*(Math.max(...xs)+Math.min(...xs));
+  const minY=Math.min(...ys);
+  const xc=xs.map(v=>v-midX);
+  const yc=ys.map(v=>v+STL_R-minY);
+  return xc.map((x,i)=>{
+    const th=2*Math.PI*i/n;
+    return[x,yc[i]*Math.cos(th),yc[i]*Math.sin(th)];
   });
 }
-
-function stlScale(pts, target) {
-  const xs=pts.map(p=>p[0]), ys=pts.map(p=>p[1]), zs=pts.map(p=>p[2]);
-  const span = Math.max(Math.max(...xs)-Math.min(...xs), Math.max(...ys)-Math.min(...ys), Math.max(...zs)-Math.min(...zs));
-  if (span < 1e-12) return pts;
-  const s = target/span;
-  return pts.map(p => [p[0]*s, p[1]*s, p[2]*s]);
+function stlScale(pts,target){
+  const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),zs=pts.map(p=>p[2]);
+  const span=Math.max(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys),Math.max(...zs)-Math.min(...zs));
+  if(span<1e-12)return pts;
+  const s=target/span; return pts.map(p=>[p[0]*s,p[1]*s,p[2]*s]);
 }
-
-function stlFrames(c) {
-  const n = c.length, T=[], N=[], B=[];
-  for (let i=0;i<n;i++){
-    const pr=c[(i-1+n)%n], nx=c[(i+1)%n];
+function stlFrames(c){
+  const n=c.length,T=[],N=[],B=[];
+  for(let i=0;i<n;i++){
+    const pr=c[(i-1+n)%n],nx=c[(i+1)%n];
     const d=[nx[0]-pr[0],nx[1]-pr[1],nx[2]-pr[2]];
     T.push(norm3(d));
   }
   let ref=[0,0,1];
-  if (Math.abs(dot3(ref,T[0]))>0.9) ref=[1,0,0];
+  if(Math.abs(dot3(ref,T[0]))>0.9)ref=[1,0,0];
   let n0=norm3(sub3(ref,scale3(dot3(ref,T[0]),T[0])));
   N.push(n0); B.push(norm3(cross3(T[0],n0)));
-  for (let i=1;i<n;i++){
+  for(let i=1;i<n;i++){
     let nv=sub3(N[i-1],scale3(dot3(N[i-1],T[i]),T[i]));
-    if (Math.hypot(...nv)<1e-12){
-      let fb=[0,0,1];
-      if(Math.abs(dot3(fb,T[i]))>0.9) fb=[1,0,0];
-      nv=sub3(fb,scale3(dot3(fb,T[i]),T[i]));
-    }
+    if(Math.hypot(...nv)<1e-12){let fb=[0,0,1];if(Math.abs(dot3(fb,T[i]))>0.9)fb=[1,0,0];nv=sub3(fb,scale3(dot3(fb,T[i]),T[i]));}
     N.push(norm3(nv)); B.push(norm3(cross3(T[i],N[i])));
   }
-  return {N,B};
+  return{N,B};
 }
-
-function stlBuildTube(c, r) {
-  const n=c.length, np=STL_N_PROF;
-  const {N,B}=stlFrames(c);
-  const verts=[];
-  for (let i=0;i<n;i++)
-    for (let j=0;j<np;j++){
-      const a=2*Math.PI*j/np, ca=Math.cos(a), sa=Math.sin(a);
-      verts.push([
-        c[i][0]+r*(ca*N[i][0]+sa*B[i][0]),
-        c[i][1]+r*(ca*N[i][1]+sa*B[i][1]),
-        c[i][2]+r*(ca*N[i][2]+sa*B[i][2])
-      ]);
+function stlBuildTube(c,r){
+  const n=c.length,np=STL_N_PROF;
+  const{N,B}=stlFrames(c); const verts=[];
+  for(let i=0;i<n;i++)
+    for(let j=0;j<np;j++){
+      const a=2*Math.PI*j/np,ca=Math.cos(a),sa=Math.sin(a);
+      verts.push([c[i][0]+r*(ca*N[i][0]+sa*B[i][0]),c[i][1]+r*(ca*N[i][1]+sa*B[i][1]),c[i][2]+r*(ca*N[i][2]+sa*B[i][2])]);
     }
   const faces=[];
-  for (let i=0;i<n;i++){
+  for(let i=0;i<n;i++){
     const i2=(i+1)%n;
-    for (let j=0;j<np;j++){
+    for(let j=0;j<np;j++){
       const j2=(j+1)%np;
-      const a=i*np+j, b=i2*np+j, cc=i2*np+j2, d=i*np+j2;
+      const a=i*np+j,b=i2*np+j,cc=i2*np+j2,d=i*np+j2;
       faces.push([a,b,cc],[a,cc,d]);
     }
   }
-  return {verts,faces};
+  return{verts,faces};
 }
-
-function stlWrite(verts, faces) {
+function stlWrite(verts,faces){
   const buf=new ArrayBuffer(80+4+faces.length*50);
-  const v=new DataView(buf);
-  let o=80;
+  const v=new DataView(buf); let o=80;
   v.setUint32(o,faces.length,true); o+=4;
-  for (const [i0,i1,i2] of faces){
+  for(const[i0,i1,i2]of faces){
     const p0=verts[i0],p1=verts[i1],p2=verts[i2];
     const n=norm3(cross3(sub3(p1,p0),sub3(p2,p0)));
-    for (const x of [...n,...p0,...p1,...p2]){ v.setFloat32(o,x,true); o+=4; }
+    for(const x of[...n,...p0,...p1,...p2]){v.setFloat32(o,x,true);o+=4;}
     v.setUint16(o,0,true); o+=2;
   }
   return buf;
 }
 
-document.getElementById('downloadSTL').addEventListener('click', () => {
-  const pts = sampleTargetPts(480);
-  if (!pts || pts.length < 10) { setStatus('draw a path first'); return; }
-  const mapped = stlScale(stlCoordMap(pts), STL_TARGET);
-  const {verts,faces} = stlBuildTube(mapped, STL_GROOVE_R);
-  const blob = new Blob([stlWrite(verts,faces)], {type:'application/octet-stream'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href=url; a.download='groove.stl'; a.click();
+// ═══════════════════════════════════════════════════════
+// BARREL CAM STL (port of cam_from_csv_smooth.py)
+// ═══════════════════════════════════════════════════════
+
+const LOCKED_AXIS_HALF_LENGTH = 52.61738204956055 * 0.8805 * 0.5; // ~23.165
+const LOCKED_SMALL_PEG_LENGTH = 4.76651;
+const LOCKED_HUB_BLEND_LENGTH = 1.45282;
+const LOCKED_SMALL_SHAFT_HALF_START = LOCKED_AXIS_HALF_LENGTH - LOCKED_SMALL_PEG_LENGTH;
+const LOCKED_HUB_FULL_HALF_END = LOCKED_SMALL_SHAFT_HALF_START - LOCKED_HUB_BLEND_LENGTH;
+
+const LOCKED_BARREL = {
+  shaftRadius: 4.40954,
+  hubRadius: 6.61608,
+  shaftHalfLength: LOCKED_AXIS_HALF_LENGTH,
+  smallShaftHalfStart: LOCKED_SMALL_SHAFT_HALF_START,
+  hubFullHalfEnd: LOCKED_HUB_FULL_HALF_END,
+  squareHoleDiagonal: 6.47168,
+  axialTravel: 12.32700,
+  trackWidth: 7.04400,
+  camInnerRadius: 6.47168,
+  radiusMin: 16.72950,
+  radiusMax: 27.73575,
+  grooveRadius: 2.20125,
+  angularSegments: 360,
+  circleSegments: 64,
+  grooveArcSegments: 20,
+  topFlatSegments: 3,
+  blendSteps: 12,
+};
+
+function getBarrelParams(){
+  return {
+    ...LOCKED_BARREL,
+    topCover: parseFloat(document.getElementById('slLip').value),
+  };
+}
+
+function smoothstep(u){ return u*u*(3-2*u); }
+function normalizeToRange(vals,outMin,outMax){
+  const lo=Math.min(...vals),hi=Math.max(...vals);
+  if(Math.abs(hi-lo)<1e-12)return vals.map(()=>(outMin+outMax)*0.5);
+  return vals.map(v=>outMin+(v-lo)/(hi-lo)*(outMax-outMin));
+}
+function resampleClosed(pts,n){
+  if(!pts || pts.length<2) return pts || [];
+  const cum=[0];
+  for(let i=1;i<pts.length;i++){
+    const dx=pts[i][0]-pts[i-1][0], dy=pts[i][1]-pts[i-1][1];
+    cum.push(cum[cum.length-1] + Math.hypot(dx,dy));
+  }
+  const dx0=pts[0][0]-pts[pts.length-1][0], dy0=pts[0][1]-pts[pts.length-1][1];
+  const total = cum[cum.length-1] + Math.hypot(dx0,dy0);
+  function pointAt(s){
+    const target=((s%total)+total)%total;
+    if(target >= cum[cum.length-1]){
+      const span=total-cum[cum.length-1] || 1e-12;
+      const f=(target-cum[cum.length-1])/span;
+      return [pts[pts.length-1][0]+f*(pts[0][0]-pts[pts.length-1][0]), pts[pts.length-1][1]+f*(pts[0][1]-pts[pts.length-1][1])];
+    }
+    let i=0;
+    while(i<cum.length-1 && cum[i+1] < target) i++;
+    const span=(cum[i+1]-cum[i]) || 1e-12;
+    const f=(target-cum[i])/span;
+    return [pts[i][0]+f*(pts[i+1][0]-pts[i][0]), pts[i][1]+f*(pts[i+1][1]-pts[i][1])];
+  }
+  const out=[];
+  for(let i=0;i<n;i++) out.push(pointAt(i*total/n));
+  return out;
+}
+function diamondRadius(theta,diagonal){
+  const d=0.5*diagonal;
+  const denom=Math.abs(Math.cos(theta))+Math.abs(Math.sin(theta));
+  return d/Math.max(denom,1e-12);
+}
+
+function buildBarrelCamSection(p){
+  const hw=p.trackWidth*0.5,gr=p.grooveRadius,top=p.topCover*gr;
+  const xIntersect=Math.sqrt(Math.max(gr*gr-top*top,0));
+  const sec=[];
+  sec.push([-hw,'fixed',p.camInnerRadius]);
+  sec.push([hw,'fixed',p.camInnerRadius]);
+  sec.push([hw,'offset',top]);
+  for(let u=0;u<=p.topFlatSegments;u++){
+    const t=u/p.topFlatSegments;
+    sec.push([hw+t*(xIntersect-hw),'offset',top]);
+  }
+  const phi=Math.asin(top/gr);
+  const nArc=p.grooveArcSegments;
+  for(let k=1;k<=nArc;k++){
+    const a=phi-(k/nArc)*(Math.PI+2*phi);
+    const dx=gr*Math.cos(a),dr=gr*Math.sin(a);
+    sec.push([dx,'offset',dr]);
+  }
+  for(let u=0;u<=p.topFlatSegments;u++){
+    const t=u/p.topFlatSegments;
+    sec.push([-xIntersect+t*(-hw+xIntersect),'offset',top]);
+  }
+  return sec;
+}
+
+function buildBarrelCamBody(csvPts,p){
+  const n=p.angularSegments;
+  const resampled=resampleClosed(csvPts,n);
+  const xNorm=normalizeToRange(resampled.map(r=>r[0]),-p.axialTravel*0.5,p.axialTravel*0.5);
+  const rNorm=normalizeToRange(resampled.map(r=>r[1]),p.radiusMin,p.radiusMax);
+  const sec=buildBarrelCamSection(p);
+  const k=sec.length;
+  const verts=new Float64Array(n*k*3);
+  for(let i=0;i<n;i++){
+    const theta=2*Math.PI*i/n,c=Math.cos(theta),s=Math.sin(theta);
+    for(let j=0;j<k;j++){
+      const[dx,mode,val]=sec[j];
+      const radius=mode==='fixed'?val:rNorm[i]+val;
+      const idx=(i*k+j)*3;
+      verts[idx]=xNorm[i]+dx; verts[idx+1]=radius*c; verts[idx+2]=radius*s;
+    }
+  }
+  const faces=[];
+  for(let i=0;i<n;i++){
+    const ni=(i+1)%n;
+    for(let j=0;j<k;j++){
+      const nj=(j+1)%k;
+      const a=i*k+j,b=ni*k+j,cc=ni*k+nj,d=i*k+nj;
+      faces.push([a,b,cc],[a,cc,d]);
+    }
+  }
+  // Convert Float64Array to array of [x,y,z]
+  const vertsArr=[];
+  for(let i=0;i<n*k;i++) vertsArr.push([verts[i*3],verts[i*3+1],verts[i*3+2]]);
+  return{verts:vertsArr,faces};
+}
+
+function buildShaftMesh(p){
+  const xh=p.shaftHalfLength;
+  const nX_pts=[];
+  function addXR(x,r){if(nX_pts.length&&Math.abs(nX_pts[nX_pts.length-1][0]-x)<1e-9)nX_pts[nX_pts.length-1][1]=r;else nX_pts.push([x,r]);}
+  addXR(-xh,p.shaftRadius);
+  addXR(-p.smallShaftHalfStart,p.shaftRadius);
+  const bStart=-p.smallShaftHalfStart,bEnd=-p.hubFullHalfEnd;
+  for(let k=0;k<=p.blendSteps;k++){
+    const u=k/p.blendSteps,uu=smoothstep(u),x=bStart+u*(bEnd-bStart);
+    addXR(x,p.shaftRadius+uu*(p.hubRadius-p.shaftRadius));
+  }
+  addXR(p.hubFullHalfEnd,p.hubRadius);
+  const bStart2=p.hubFullHalfEnd,bEnd2=p.smallShaftHalfStart;
+  for(let k=1;k<=p.blendSteps;k++){
+    const u=k/p.blendSteps,uu=smoothstep(u),x=bStart2+u*(bEnd2-bStart2);
+    addXR(x,p.hubRadius+uu*(p.shaftRadius-p.hubRadius));
+  }
+  addXR(xh,p.shaftRadius);
+  const nA=p.circleSegments,nXp=nX_pts.length;
+  const outerIdx=[],innerIdx=[];
+  const verts=[];
+  for(let i=0;i<nXp;i++){
+    const[x,r]=nX_pts[i];
+    outerIdx.push([]);
+    for(let j=0;j<nA;j++){
+      const theta=2*Math.PI*j/nA;
+      outerIdx[i].push(verts.length);
+      verts.push([x,r*Math.cos(theta),r*Math.sin(theta)]);
+    }
+    innerIdx.push([]);
+    for(let j=0;j<nA;j++){
+      const theta=2*Math.PI*j/nA,rho=diamondRadius(theta,p.squareHoleDiagonal);
+      innerIdx[i].push(verts.length);
+      verts.push([x,rho*Math.cos(theta),rho*Math.sin(theta)]);
+    }
+  }
+  const faces=[];
+  for(let i=0;i<nXp-1;i++){
+    for(let j=0;j<nA;j++){
+      const jn=(j+1)%nA;
+      const a=outerIdx[i][j],b=outerIdx[i+1][j],c=outerIdx[i+1][jn],d=outerIdx[i][jn];
+      faces.push([a,b,c],[a,c,d]);
+    }
+  }
+  for(let i=0;i<nXp-1;i++){
+    for(let j=0;j<nA;j++){
+      const jn=(j+1)%nA;
+      const a=innerIdx[i][j],b=innerIdx[i][jn],c=innerIdx[i+1][jn],d=innerIdx[i+1][j];
+      faces.push([a,b,c],[a,c,d]);
+    }
+  }
+  for(const i of[0,nXp-1]){
+    const rev=i===0;
+    for(let j=0;j<nA;j++){
+      const jn=(j+1)%nA;
+      const o0=outerIdx[i][j],o1=outerIdx[i][jn],h0=innerIdx[i][j],h1=innerIdx[i][jn];
+      if(rev){faces.push([o0,h1,h0],[o0,o1,h1]);}
+      else{faces.push([o0,h0,h1],[o0,h1,o1]);}
+    }
+  }
+  return{verts,faces};
+}
+
+function mergeBarrelMeshes(meshes){
+  let off=0; const allV=[],allF=[];
+  for(const m of meshes){
+    for(const v of m.verts)allV.push(v);
+    for(const f of m.faces)allF.push(f.map(i=>i+off));
+    off+=m.verts.length;
+  }
+  return{verts:allV,faces:allF};
+}
+
+function writeBarrelSTL(verts,faces){
+  const buf=new ArrayBuffer(80+4+faces.length*50);
+  const dv=new DataView(buf); let o=80;
+  dv.setUint32(o,faces.length,true); o+=4;
+  for(const f of faces){
+    const p0=verts[f[0]],p1=verts[f[1]],p2=verts[f[2]];
+    const e1=[p1[0]-p0[0],p1[1]-p0[1],p1[2]-p0[2]];
+    const e2=[p2[0]-p0[0],p2[1]-p0[1],p2[2]-p0[2]];
+    const n=[e1[1]*e2[2]-e1[2]*e2[1],e1[2]*e2[0]-e1[0]*e2[2],e1[0]*e2[1]-e1[1]*e2[0]];
+    const nl=Math.hypot(...n);
+    const nv=nl>1e-12?n.map(x=>x/nl):[0,0,1];
+    for(const x of[...nv,...p0,...p1,...p2]){dv.setFloat32(o,x,true);o+=4;}
+    dv.setUint16(o,0,true);o+=2;
+  }
+  return buf;
+}
+
+function getCurrentTrajPts(){
+  const useOpt=(optimizedNodes&&curveMode!=='original');
+  const N=480;
+  if(useOpt) return sampleOptimizedSourcePts(N);
+  return sampleTargetPts(N);
+}
+
+function downloadBarrelSTL(){
+  const pts=getCurrentTrajPts();
+  if(!pts||pts.length<10){setStatus('draw a path first');return;}
+  const p=getBarrelParams();
+  const csvPts=pts.map(pt=>[pt.x,pt.y]);
+  const camMesh=buildBarrelCamBody(csvPts,p);
+  const shaftMesh=buildShaftMesh(p);
+  const merged=mergeBarrelMeshes([shaftMesh,camMesh]);
+  const buf=writeBarrelSTL(merged.verts,merged.faces);
+  const blob=new Blob([buf],{type:'application/octet-stream'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='barrel_cam.stl'; a.click();
   URL.revokeObjectURL(url);
-  setStatus('downloaded groove.stl');
-});
+  setStatus(`barrel_cam.stl downloaded (${merged.faces.length.toLocaleString()} tris)`);
+}
 
-document.getElementById('btnPlus').addEventListener('click', () => {
-  if (numPts >= 12) return;
-  numPts++;
-  const l = nodes[nodes.length - 1], f = nodes[0];
-  nodes.push({ x: (l.x + f.x) / 2, y: (l.y + f.y) / 2 });
-  document.getElementById('ptCount').textContent = numPts;
-  splineDirty = true;
-  _splinePts = [];
-  camSystem = null;
-  document.getElementById('paramsPanel').style.display = 'none';
-  pushHistory();
-  draw();
-});
-document.getElementById('btnMinus').addEventListener('click', () => {
-  if (numPts <= 3) return;
-  numPts--;
-  nodes.pop();
-  document.getElementById('ptCount').textContent = numPts;
-  splineDirty = true;
-  _splinePts = [];
-  camSystem = null;
-  document.getElementById('paramsPanel').style.display = 'none';
-  pushHistory();
-  draw();
-});
+document.getElementById('downloadSTL').addEventListener('click',downloadBarrelSTL);
 
-document.querySelectorAll('.figure-card').forEach(c => {
-  c.addEventListener('click', function() {
-    document.querySelectorAll('.figure-card').forEach(x => x.classList.remove('active'));
-    this.classList.add('active');
-    selectedEmoji = this.querySelector('.figure-icon').textContent.trim();
-    draw();
+// ═══════════════════════════════════════════════════════
+// EMBEDDED THREE.JS WEBGL PREVIEW
+// ═══════════════════════════════════════════════════════
+let threeRenderer=null,threeScene=null,threeCamera=null,threeCamGroup=null;
+let isDragging3D=false,lastMouse3D={x:0,y:0},rotX=0.35,rotY=0.55,zoomD=110;
+let rafId3D=null, pendingThreeRebuild=false;
+
+function ensureThreeLoaded(cb){
+  if(window.THREE){ cb(); return; }
+  const existing=document.getElementById('threejsScript');
+  if(existing){ existing.addEventListener('load',cb,{once:true}); return; }
+  const s=document.createElement('script');
+  s.id='threejsScript';
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  s.onload=cb;
+  document.head.appendChild(s);
+}
+
+function initThree(canvas){
+  if(threeRenderer)return;
+  const THREE=window.THREE;
+  threeRenderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  threeRenderer.setPixelRatio(window.devicePixelRatio||1);
+  threeRenderer.setClearColor(0x0a0e28,1);
+
+  threeScene=new THREE.Scene();
+  threeCamera=new THREE.PerspectiveCamera(42,Math.max(canvas.offsetWidth,1)/Math.max(canvas.offsetHeight,1),0.5,800);
+  threeCamera.position.set(0,0,zoomD);
+
+  threeScene.add(new THREE.AmbientLight(0xffffff,0.45));
+  const dirA=new THREE.DirectionalLight(0x8ab4f8,1.2); dirA.position.set(1,1.5,2); threeScene.add(dirA);
+  const dirB=new THREE.DirectionalLight(0xf8c56a,0.5); dirB.position.set(-2,-1,1); threeScene.add(dirB);
+  const pt=new THREE.PointLight(0xffffff,0.3,200); pt.position.set(0,40,40); threeScene.add(pt);
+
+  threeCamGroup=new THREE.Group(); threeScene.add(threeCamGroup);
+}
+
+function buildThreeMesh(verts,faces,mat){
+  const THREE=window.THREE;
+  const geo=new THREE.BufferGeometry();
+  const pos=new Float32Array(faces.length*3*3);
+  const nrm=new Float32Array(faces.length*3*3);
+  let vi=0;
+  for(const f of faces){
+    const p0=verts[f[0]],p1=verts[f[1]],p2=verts[f[2]];
+    const e1=[p1[0]-p0[0],p1[1]-p0[1],p1[2]-p0[2]];
+    const e2=[p2[0]-p0[0],p2[1]-p0[1],p2[2]-p0[2]];
+    const nx=e1[1]*e2[2]-e1[2]*e2[1],ny=e1[2]*e2[0]-e1[0]*e2[2],nz=e1[0]*e2[1]-e1[1]*e2[0];
+    const nl=Math.sqrt(nx*nx+ny*ny+nz*nz)+1e-12;
+    for(const pt of[p0,p1,p2]){
+      pos[vi*3]=pt[0]; pos[vi*3+1]=pt[1]; pos[vi*3+2]=pt[2];
+      nrm[vi*3]=nx/nl; nrm[vi*3+1]=ny/nl; nrm[vi*3+2]=nz/nl;
+      vi++;
+    }
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('normal',new THREE.BufferAttribute(nrm,3));
+  return new THREE.Mesh(geo,mat);
+}
+
+function computeCamCenterlineMetrics(pts,p){
+  // Use the exact same arc-length-resampled trajectory that feeds the STL.
+  // This check is intentionally conservative, but not meant to be a hard manufacturing proof.
+  const resampled=resampleClosed(pts.map(pt=>[pt.x,pt.y]), p.angularSegments);
+  const xNorm=normalizeToRange(resampled.map(r=>r[0]),-p.axialTravel*0.5,p.axialTravel*0.5);
+  const rNorm=normalizeToRange(resampled.map(r=>r[1]),p.radiusMin,p.radiusMax);
+  const centers=[];
+  for(let i=0;i<resampled.length;i++){
+    const theta=2*Math.PI*i/resampled.length;
+    centers.push([xNorm[i], rNorm[i]*Math.cos(theta), rNorm[i]*Math.sin(theta)]);
+  }
+
+  // Light smoothing removes one-sample curvature noise from polygonal discretization.
+  const smoothCenters=centers.map((b,i)=>{
+    const a=centers[(i-1+centers.length)%centers.length];
+    const c=centers[(i+1)%centers.length];
+    return [
+      0.25*a[0]+0.5*b[0]+0.25*c[0],
+      0.25*a[1]+0.5*b[1]+0.25*c[1],
+      0.25*a[2]+0.5*b[2]+0.25*c[2],
+    ];
   });
+
+  let minRad=Infinity;
+  for(let i=0;i<smoothCenters.length;i++){
+    const a=smoothCenters[(i-1+smoothCenters.length)%smoothCenters.length];
+    const b=smoothCenters[i];
+    const c=smoothCenters[(i+1)%smoothCenters.length];
+    const ab=[b[0]-a[0],b[1]-a[1],b[2]-a[2]];
+    const bc=[c[0]-b[0],c[1]-b[1],c[2]-b[2]];
+    const ac=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+    const lab=Math.hypot(...ab), lbc=Math.hypot(...bc), lac=Math.hypot(...ac);
+    const cross=[ab[1]*ac[2]-ab[2]*ac[1], ab[2]*ac[0]-ab[0]*ac[2], ab[0]*ac[1]-ab[1]*ac[0]];
+    const crossMag=Math.hypot(...cross);
+    if(crossMag < 1e-9 || lab<1e-9 || lbc<1e-9 || lac<1e-9) continue;
+    const curvature=(2*crossMag)/(lab*lbc*lac);
+    if(curvature>1e-9) minRad=Math.min(minRad,1/curvature);
+  }
+
+  const gr=p.grooveRadius;
+  const ratio=minRad/gr;
+  let status='safe', note='Arc-length sampled groove turns are comfortably larger than the groove radius.';
+  if(!Number.isFinite(minRad)) {
+    status='caution';
+    note='Could not estimate a reliable bend radius from the arc-length-sampled groove.';
+  } else if(ratio < 1.35) {
+    status='risky';
+    note='Some arc-length-sampled bends are very tight relative to the groove radius; check this model before printing.';
+  } else if(ratio < 2.25) {
+    status='caution';
+    note='Some arc-length-sampled bends are moderately tight relative to the groove radius; likely inspect manually.';
+  }
+  return { minBendRadius:minRad, ratio, status, note };
+}
+
+function rebuildThreeScene(){
+  const THREE=window.THREE;
+  if(!THREE||!threeCamGroup)return;
+  while(threeCamGroup.children.length)threeCamGroup.remove(threeCamGroup.children[0]);
+
+  const pts=getCurrentTrajPts();
+  if(!pts||pts.length<4)return;
+  const p=getBarrelParams();
+  const csvPts=pts.map(pt=>[pt.x,pt.y]);
+  const camMesh=buildBarrelCamBody(csvPts,p);
+  const shaftMesh=buildShaftMesh(p);
+
+  const matShaft=new THREE.MeshPhongMaterial({color:0x5e6fa9,shininess:80,specular:0x8aacf0});
+  const matCam=new THREE.MeshPhongMaterial({color:0x243c78,shininess:120,specular:0xc2ddff,transparent:true,opacity:0.94});
+  threeCamGroup.add(buildThreeMesh(shaftMesh.verts,shaftMesh.faces,matShaft));
+  threeCamGroup.add(buildThreeMesh(camMesh.verts,camMesh.faces,matCam));
+  updateCamInfo(p, computeCamCenterlineMetrics(pts,p));
+}
+
+function updateCamInfo(p, metrics){
+  const gr=p.grooveRadius,top=p.topCover;
+  const slot=2*gr*Math.sqrt(Math.max(1-top*top,0));
+  const ball=2*gr;
+  const lip=0.5*(ball-slot);
+  document.getElementById('lbGroove').textContent=gr.toFixed(2)+' mm';
+  document.getElementById('lbTrack').textContent=p.trackWidth.toFixed(2)+' mm';
+  document.getElementById('lbAxial').textContent=p.axialTravel.toFixed(2)+' mm';
+  document.getElementById('lbRmin').textContent=p.radiusMin.toFixed(2)+' mm';
+  document.getElementById('lbRmax').textContent=p.radiusMax.toFixed(2)+' mm';
+  document.getElementById('infoaxis').textContent=(2*p.shaftHalfLength).toFixed(2)+' mm';
+  document.getElementById('infoball').textContent=ball.toFixed(2)+' mm';
+  document.getElementById('infoslot').textContent=slot.toFixed(2)+' mm';
+  document.getElementById('infolip').textContent=lip.toFixed(2)+' mm';
+  document.getElementById('infobend').textContent=Number.isFinite(metrics.minBendRadius) ? metrics.minBendRadius.toFixed(2)+' mm' : '—';
+  document.getElementById('inforatio').textContent=Number.isFinite(metrics.ratio) ? metrics.ratio.toFixed(2)+'×' : '—';
+  const badge=document.getElementById('infostatus');
+  badge.textContent=metrics.status;
+  badge.className='cam-badge '+metrics.status;
+  document.getElementById('manufactureNote').textContent=metrics.note + ' This uses groove radius as a proxy, not a final machinability proof.';
+}
+
+function render3D(){
+  if(!threeRenderer)return;
+  const canvas=document.getElementById('camWebGL');
+  const w=Math.max(canvas.offsetWidth,1),h=Math.max(canvas.offsetHeight,1);
+  threeRenderer.setSize(w,h,false);
+  threeCamera.aspect=w/h;
+  threeCamera.updateProjectionMatrix();
+  threeCamera.position.set(0,0,zoomD);
+  if(threeCamGroup){
+    threeCamGroup.rotation.x=rotX+Math.PI/2;
+    threeCamGroup.rotation.z=rotY;
+  }
+  threeRenderer.render(threeScene,threeCamera);
+  rafId3D=requestAnimationFrame(render3D);
+}
+
+function scheduleCamPreviewRebuild(){
+  pendingThreeRebuild=true;
+  ensureThreeLoaded(()=>{
+    const canvas=document.getElementById('camWebGL');
+    if(!threeRenderer)initThree(canvas);
+    if(pendingThreeRebuild){ rebuildThreeScene(); pendingThreeRebuild=false; }
+    if(!rafId3D) render3D();
+  });
+}
+
+document.getElementById('camResetView').addEventListener('click',()=>{rotX=0.35;rotY=0.55;zoomD=110;});
+document.getElementById('toggleCamWide').addEventListener('click',()=>{
+  const sidebar=document.querySelector('.sidebar');
+  const isWide=sidebar.classList.toggle('wide');
+  document.getElementById('toggleCamWide').textContent=isWide?'shrink':'widen';
+  setTimeout(()=>scheduleCamPreviewRebuild(),20);
+});
+const camWebGL=document.getElementById('camWebGL');
+camWebGL.addEventListener('mousedown',e=>{isDragging3D=true;lastMouse3D={x:e.clientX,y:e.clientY};e.preventDefault();});
+window.addEventListener('mousemove',e=>{
+  if(!isDragging3D)return;
+  rotY+=(e.clientX-lastMouse3D.x)*0.008;
+  rotX+=(e.clientY-lastMouse3D.y)*0.008;
+  lastMouse3D={x:e.clientX,y:e.clientY};
+});
+window.addEventListener('mouseup',()=>{isDragging3D=false;});
+camWebGL.addEventListener('wheel',e=>{zoomD=Math.max(20,Math.min(320,zoomD+e.deltaY*0.15));e.preventDefault();},{passive:false});
+
+// Param sliders for embedded cam panel
+const sliderDefs=[
+  {id:'slLip', lb:'lbLip', suffix:'', decimals:2},
+];
+sliderDefs.forEach(({id,lb,suffix,decimals})=>{
+  const sl=document.getElementById(id);
+  const lbl=document.getElementById(lb);
+  const update=()=>{
+    lbl.textContent=parseFloat(sl.value).toFixed(decimals)+suffix;
+    scheduleCamPreviewRebuild();
+  };
+  sl.addEventListener('input',update);
+  update();
 });
 
 // Help
-document.getElementById('helpBtn').addEventListener('click', () => {
-  const r = cv.getBoundingClientRect(), tip = document.getElementById('tipCircle');
-  tip.style.left  = (r.left + CX * (r.width / W)) + 'px';
-  tip.style.top   = (r.top + CY * (r.height / H) + 48) + 'px';
-  tip.style.transform = 'translate(-50%,-50%)';
+document.getElementById('helpBtn').addEventListener('click',()=>{
+  const r=cv.getBoundingClientRect(),tip=document.getElementById('tipCircle');
+  tip.style.left=(r.left+CX*(r.width/W))+'px';
+  tip.style.top=(r.top+CY*(r.height/H)+48)+'px';
+  tip.style.transform='translate(-50%,-50%)';
   document.getElementById('helpOverlay').classList.add('open');
 });
-document.getElementById('helpOverlay').addEventListener('click', () => {
-  document.getElementById('helpOverlay').classList.remove('open');
+const helpOverlayEl = document.getElementById('helpOverlay');
+function closeHelpOverlay(){ helpOverlayEl.classList.remove('open'); }
+helpOverlayEl.addEventListener('click', closeHelpOverlay);
+document.addEventListener('pointerdown', e => {
+  if (helpOverlayEl.classList.contains('open') && e.target.closest('#helpOverlay')) closeHelpOverlay();
+}, true);
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeHelpOverlay();
+    closePresets();
+  }
 });
 
-// ══════════════════════════════════════════════════════
-// INIT + RESIZE
-// ══════════════════════════════════════════════════════
-window.addEventListener('resize', () => {
-  setupCanvas();
-  resetNodes();
-  camSystem = null;
-  document.getElementById('paramsPanel').style.display = 'none';
-  pushHistory();
-  draw();
+// ═══════════════════════════════════════════════════════
+// POINT COUNT
+// ═══════════════════════════════════════════════════════
+document.getElementById('btnPlus').addEventListener('click',()=>{
+  if(numPts>=12)return;
+  numPts++;
+  const l=nodes[nodes.length-1],f=nodes[0];
+  nodes.push({x:(l.x+f.x)/2,y:(l.y+f.y)/2});
+  document.getElementById('ptCount').textContent=numPts;
+  splineDirty=true; _splinePts=[]; camSystem=null; optimizedNodes=null; curveMode='original';
+  document.getElementById('paramsPanel').style.display='none';
+  document.getElementById('toolOptimize').disabled=false;
+  scheduleCamPreviewRebuild();
+  document.getElementById('toolOptimize').classList.remove('opt-active');
+  updateCurveToggleUI(); pushHistory(); rebuildGeneratedCam(false); scheduleCamPreviewRebuild(); draw();
+});
+document.getElementById('btnMinus').addEventListener('click',()=>{
+  if(numPts<=3)return;
+  numPts--; nodes.pop();
+  document.getElementById('ptCount').textContent=numPts;
+  splineDirty=true; _splinePts=[]; camSystem=null; optimizedNodes=null; curveMode='original';
+  document.getElementById('paramsPanel').style.display='none';
+  document.getElementById('toolOptimize').disabled=false;
+  scheduleCamPreviewRebuild();
+  document.getElementById('toolOptimize').classList.remove('opt-active');
+  updateCurveToggleUI(); pushHistory(); rebuildGeneratedCam(false); scheduleCamPreviewRebuild(); draw();
 });
 
-(function init() {
-  setupCanvas();
-  resetNodes();
-  pushHistory();
-  updateSpeedLabel();
-  draw();
+// ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+function tick(){ return new Promise(r=>setTimeout(r,0)); }
+
+// ═══════════════════════════════════════════════════════
+// RESIZE + INIT
+// ═══════════════════════════════════════════════════════
+window.addEventListener('resize',()=>{
+  setupCanvas(); resetNodes(); camSystem=null;
+  document.getElementById('paramsPanel').style.display='none';
+  document.getElementById('toolOptimize').disabled=false;
+  pushHistory(); rebuildGeneratedCam(false); scheduleCamPreviewRebuild(); draw();
+});
+
+(function init(){
+  setupCanvas(); resetNodes(); pushHistory(); updateSpeedLabel(); updateFitLabel();
+  updateCurveToggleUI(); rebuildGeneratedCam(false); scheduleCamPreviewRebuild(); draw();
 })();
-
 </script>
 </body>
 </html>

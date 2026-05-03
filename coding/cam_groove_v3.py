@@ -34,11 +34,11 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 inp = input()
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-R        = 10.0 # mm
-r_g      = 2.5 # mm
-P        = 2 # mm
+R        = 10.0 # mm radius of cylinder axis
+r_g      = 2.5 # mm radius of spheres that make up groove
+P        = 2 # mm 
 HALF_H   = 15.0 # mm
-GRID_RES = 100 # size of 3d grid
+GRID_RES = 200 # size of 3d grid
 CSV_PATH = f"~/Downloads/{inp}.csv"   # List of x,y coordinates
 SCALE = 0.2     # Scaling of x,y points (0,1)
 COVERAGE = 0.65 # value to determine how much the groove is covered (0,1)
@@ -53,14 +53,16 @@ t = np.linspace(0, 1, N, endpoint=False)
 avg = SCALE * (np.mean(x_t + y_t)) / 2
 x_t = (x_t - np.mean(x_t)) / avg
 y_t = (y_t - np.min(y_t)) / avg  
-print(x_t)
-print(y_t)
-exit
 
 # Make radius always valid
 r_t = R + y_t          # always >= R
 
 theta = 2 * np.pi * t
+
+# GRADIENTS TO CHECK GROOVE FEASIBILITY, oversample maybe and then choose the best ones. best 1/2?
+dt =  1
+dydt = abs(np.array([y_t[i+1] - y_t[i] for i in range(N-1)]))
+dxdt = abs(np.array([x_t[i+1] - x_t[i] for i in range(N-1)]))
 
 # Prism dims per spec
 l   = 2 * r_g + P                # axial width      (x direction)
@@ -87,7 +89,7 @@ print(f"Computing SDFs over {GRID_RES}³ grid with N={N} samples…")
 for i in range(N):
     if i % 100 == 0:
         print(f"  {i}/{N}…")
-
+        
     th = theta[i]
     xi = x_t[i]
     ri = r_t[i]
@@ -115,7 +117,6 @@ for i in range(N):
     z_loc  = -s * Yg + c * Zg
 
     # Ellipse in local x-y plane
-    # MAYBE CHANGE BOTH TO l / 2
     a = l / 2        # semi-axis along x
     b = w / 2        # semi-axis along local y
 
