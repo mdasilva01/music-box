@@ -507,7 +507,8 @@ body {
 .cam-badge { display:inline-flex; align-items:center; justify-content:center; padding:4px 8px; border-radius:999px; font-size:8.5px; letter-spacing:.08em; text-transform:uppercase; border:1px solid rgba(44,49,112,.15); }
 .cam-badge.safe { background: rgba(5,150,105,0.12); color:#047857; }
 .cam-badge.caution { background: rgba(245,158,11,0.14); color:#b45309; }
-.cam-badge.risky { background: rgba(220,38,38,0.12); color:#b91c1c; }
+.cam-badge.risky { background: rgba(220,38,38,0.12); color:#b9501c; }
+.cam-badge.impossible { background: rgba(220,38,38,0.12); color:#ff0000; }
 .cam-rotate-hint { font-size: 8.5px; color: #6a7895; text-align: center; }
 
 /* ─── Curve toggle strip ─── *//* ─── Curve toggle strip ─── */
@@ -581,7 +582,7 @@ body {
         <button class="tool-btn" id="toolAnimate">▶ Animate Drawing</button>
         <div class="pts-label">trajectory speed</div>
         <div class="pts-slider-wrap">
-          <input type="range" id="speedSlider" min="0.02" max="1.00" step="0.02" value="0.20"/>
+          <input type="range" id="speedSlider" min="0.01" max="5.00" step="0.02" value="0.20"/>
           <span class="pts-val speed-readout" id="speedVal">1.0x</span>
         </div>
       </div>
@@ -611,8 +612,8 @@ body {
         <div>
           <div class="cam-section-title">Adjustable</div>
           <div class="cam-param-row">
-            <div class="cam-param-label">Lip cover <span class="cam-param-val" id="lbLip">0.65</span></div>
-            <input type="range" id="slLip" min="0.01" max="0.95" step="0.01" value="0.65"/>
+            <div class="cam-param-label">Lip cover <span class="cam-param-val" id="lbLip">0.7</span></div>
+            <input type="range" id="slLip" min="0.01" max="0.95" step="0.01" value="0.7"/>
           </div>
         </div>
 
@@ -633,10 +634,10 @@ body {
           <div class="cam-info-row">Ball diameter <span class="cam-info-val" id="infoball">—</span></div>
           <div class="cam-info-row">Slot opening <span class="cam-info-val" id="infoslot">—</span></div>
           <div class="cam-info-row">Lip overhang <span class="cam-info-val" id="infolip">—</span></div>
-          <div class="cam-info-row">Min bend radius <span class="cam-info-val" id="infobend">—</span></div>
-          <div class="cam-info-row">Bend / groove ratio <span class="cam-info-val" id="inforatio">—</span></div>
+          <div class="cam-info-row">Robust bend radius <span class="cam-info-val" id="infobend">—</span></div>
+          <div class="cam-info-row">Bend/groove score <span class="cam-info-val" id="inforatio">—</span></div>
           <div class="cam-info-row">Status <span class="cam-info-val" id="infostatusWrap"><span class="cam-badge" id="infostatus">—</span></span></div>
-          <div class="cam-note" id="manufactureNote">Using the arc-length-sampled groove and groove radius as a proxy for tight turns.</div>
+          <div class="cam-note" id="manufactureNote">Heuristic review score based on the unwrapped, arc-length-sampled groove.</div>
         </div>
 
         <div class="cam-rotate-hint">Drag to rotate · scroll to zoom</div>
@@ -710,6 +711,7 @@ let dragging  = null;
 let camSystem = null;
 let animating = false;
 let animT     = 0;
+let animDistance = 0;
 let animFrame = null;
 let splineDirty = true;
 let _splineData = null;
@@ -729,7 +731,9 @@ function resetNodes() {
   }
   splineDirty = true;
   _splinePts = [];
+  invalidateAnimPathCache();
   optimizedNodes = null;
+  invalidateAnimPathCache();
   curveMode = 'original';
   updateCurveToggleUI();
 }
@@ -1059,6 +1063,87 @@ function camStateAt(sys, tau) {
   return { x, y, rx, ry, theta };
 }
 
+
+// ═══════════════════════════════════════════════════════
+// ARC-LENGTH ANIMATION
+// The pencil advances by distance along the active curve, not by raw spline t.
+// This gives constant on-screen speed everywhere on the drawing.
+// ═══════════════════════════════════════════════════════
+let _animPathCache = null;
+
+function invalidateAnimPathCache() {
+  _animPathCache = null;
+}
+
+function getActiveCurveKey() {
+  const nodeKey = nodes.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join('|');
+  const optKey = optimizedNodes ? optimizedNodes.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join('|') : 'none';
+  return `${curveMode}::${nodeKey}::${optKey}`;
+}
+
+function evalActiveSplineParam(t) {
+  const useCurve = (optimizedNodes && curveMode !== 'original');
+  return useCurve ? evalOptimizedSpline(t) : evalSpline(t);
+}
+
+function buildAnimationPathCache() {
+  const key = getActiveCurveKey();
+  if (_animPathCache && _animPathCache.key === key) return _animPathCache;
+
+  const DENSE = 2400;
+  const pts = new Array(DENSE);
+  for (let i = 0; i < DENSE; i++) pts[i] = evalActiveSplineParam(i / DENSE);
+
+  const cum = new Float64Array(DENSE + 1);
+  for (let i = 1; i < DENSE; i++) {
+    const dx = pts[i].x - pts[i - 1].x;
+    const dy = pts[i].y - pts[i - 1].y;
+    cum[i] = cum[i - 1] + Math.hypot(dx, dy);
+  }
+  const dx0 = pts[0].x - pts[DENSE - 1].x;
+  const dy0 = pts[0].y - pts[DENSE - 1].y;
+  cum[DENSE] = cum[DENSE - 1] + Math.hypot(dx0, dy0);
+
+  _animPathCache = { key, pts, cum, totalLen: Math.max(cum[DENSE], 1e-9) };
+  return _animPathCache;
+}
+
+function pointAtActiveArcLength(distance) {
+  const cache = buildAnimationPathCache();
+  const { pts, cum, totalLen } = cache;
+  const DENSE = pts.length;
+  const s = ((distance % totalLen) + totalLen) % totalLen;
+
+  let lo = 0, hi = DENSE;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (cum[mid] < s) lo = mid + 1;
+    else hi = mid;
+  }
+
+  const j = Math.max(0, lo - 1);
+  if (j >= DENSE - 1) {
+    const span = Math.max(totalLen - cum[DENSE - 1], 1e-9);
+    const f = (s - cum[DENSE - 1]) / span;
+    return {
+      x: pts[DENSE - 1].x + f * (pts[0].x - pts[DENSE - 1].x),
+      y: pts[DENSE - 1].y + f * (pts[0].y - pts[DENSE - 1].y)
+    };
+  }
+
+  const span = Math.max(cum[j + 1] - cum[j], 1e-9);
+  const f = (s - cum[j]) / span;
+  return {
+    x: pts[j].x + f * (pts[j + 1].x - pts[j].x),
+    y: pts[j].y + f * (pts[j + 1].y - pts[j].y)
+  };
+}
+
+function getAnimationPixelsPerSecond() {
+  // Slider remains 0.02–1.00, but now it maps to real canvas pixels per second.
+  return 20 + animSpeed * 260;
+}
+
 // ═══════════════════════════════════════════════════════
 // DRAWING
 // ═══════════════════════════════════════════════════════
@@ -1219,8 +1304,7 @@ function roundRect(c,x,y,w,h,r){
 }
 
 function drawAnimDots() {
-  const useCurve = (optimizedNodes && curveMode !== 'original');
-  const sp = useCurve ? evalOptimizedSpline(animT) : evalSpline(animT);
+  const sp = pointAtActiveArcLength(animDistance);
 
   ctx.save();
   ctx.font='30px sans-serif';
@@ -1266,6 +1350,7 @@ function updateCurveToggleUI() {
 function setCurveMode(mode) {
   curveMode = mode;
   updateCurveToggleUI();
+  invalidateAnimPathCache();
   rebuildGeneratedCam(false);
   scheduleCamPreviewRebuild();
   draw();
@@ -1283,7 +1368,7 @@ function renderParams() {
 
 const speedSlider = document.getElementById('speedSlider');
 function updateSpeedLabel(){
-  document.getElementById('speedVal').textContent=(5*animSpeed).toFixed(1)+'x';
+  document.getElementById('speedVal').textContent=Math.round(getAnimationPixelsPerSecond())+' px/s';
   speedSlider.value=animSpeed.toFixed(2);
 }
 speedSlider.addEventListener('input',()=>{ animSpeed=parseFloat(speedSlider.value); updateSpeedLabel(); });
@@ -1334,6 +1419,7 @@ async function runOptimize() {
     setTimeout(() => {
       try {
         const smoothBoost = 1 / fitMult;
+        invalidateAnimPathCache();
         optimizedNodes = optimizeCurve({
           alpha: 0.25 * smoothBoost,
           beta: 0.70 * fitMult,
@@ -1372,8 +1458,9 @@ function acceptOptimizedCurve() {
   numPts = nodes.length;
   document.getElementById('ptCount').textContent=numPts;
   optimizedNodes = null;
+  invalidateAnimPathCache();
   curveMode = 'original';
-  splineDirty = true; _splinePts = [];
+  splineDirty = true; _splinePts = []; invalidateAnimPathCache();
   document.getElementById('acceptOpt').disabled=true;
   document.getElementById('rejectOpt').disabled=true;
   document.getElementById('toolOptimize').classList.remove('opt-active');
@@ -1385,6 +1472,7 @@ function acceptOptimizedCurve() {
 
 function rejectOptimizedCurve() {
   optimizedNodes = null;
+  invalidateAnimPathCache();
   curveMode = 'original';
   document.getElementById('acceptOpt').disabled=true;
   document.getElementById('rejectOpt').disabled=true;
@@ -1402,19 +1490,21 @@ function startAnim(){
   animating=true;
   document.getElementById('toolAnimate').textContent='⏹ Stop';
   document.getElementById('toolAnimate').classList.add('active');
+  buildAnimationPathCache();
   let last=null;
   function step(ts){
     if(!animating)return;
     if(last===null)last=ts;
     const dt=Math.min((ts-last)/1000,0.05); last=ts;
-    animT=(animT+dt*animSpeed)%1;
+    animDistance=(animDistance + dt * getAnimationPixelsPerSecond()) % buildAnimationPathCache().totalLen;
+    animT = animDistance / buildAnimationPathCache().totalLen;
     draw(); animFrame=requestAnimationFrame(step);
   }
   animFrame=requestAnimationFrame(step);
 }
 function stopAnim(){
   animating=false;
-  document.getElementById('toolAnimate').textContent='▶ Animate';
+  document.getElementById('toolAnimate').textContent='▶ Animate Drawing';
   document.getElementById('toolAnimate').classList.remove('active');
   if(animFrame){ cancelAnimationFrame(animFrame); animFrame=null; }
 }
@@ -1436,7 +1526,7 @@ function restoreHistory(idx){
   nodes=_hist[idx].map(n=>({x:n.x,y:n.y}));
   numPts=nodes.length;
   document.getElementById('ptCount').textContent=numPts;
-  splineDirty=true; _splinePts=[];
+  splineDirty=true; _splinePts=[]; invalidateAnimPathCache();
   camSystem=null; optimizedNodes=null; curveMode='original';
   document.getElementById('paramsPanel').style.display='none';
   document.getElementById('toolOptimize').disabled=false;
@@ -1528,7 +1618,7 @@ function applyPreset(preset){
   nodes=preset.nodes.map(([nx,ny])=>({x:CX+nx*r,y:CY+ny*r}));
   numPts=nodes.length;
   document.getElementById('ptCount').textContent=numPts;
-  splineDirty=true; _splinePts=[];
+  splineDirty=true; _splinePts=[]; invalidateAnimPathCache();
   camSystem=null; optimizedNodes=null; curveMode='original';
   document.getElementById('paramsPanel').style.display='none';
   document.getElementById('toolOptimize').disabled=false;
@@ -1555,7 +1645,7 @@ cv.addEventListener('mousemove',e=>{
   const pos=getPos(e);
   if(dragging!==null){
     nodes[dragging]={x:pos.x,y:pos.y};
-    splineDirty=true; _splinePts=[];
+    splineDirty=true; _splinePts=[]; invalidateAnimPathCache();
     camSystem=null; optimizedNodes=null; curveMode='original';
     document.getElementById('paramsPanel').style.display='none';
     document.getElementById('toolOptimize').disabled=false;
@@ -1573,7 +1663,7 @@ cv.addEventListener('touchmove',e=>{
   e.preventDefault();
   if(dragging!==null){
     const pos=getPos(e); nodes[dragging]={x:pos.x,y:pos.y};
-    splineDirty=true; _splinePts=[]; camSystem=null; optimizedNodes=null; curveMode='original';
+    splineDirty=true; _splinePts=[]; invalidateAnimPathCache(); invalidateAnimPathCache(); camSystem=null; optimizedNodes=null; curveMode='original';
     document.getElementById('paramsPanel').style.display='none';
     document.getElementById('toolOptimize').disabled=false;
   scheduleCamPreviewRebuild();
@@ -1986,58 +2076,127 @@ function buildThreeMesh(verts,faces,mat){
 }
 
 function computeCamCenterlineMetrics(pts,p){
-  // Use the exact same arc-length-resampled trajectory that feeds the STL.
-  // This check is intentionally conservative, but not meant to be a hard manufacturing proof.
-  const resampled=resampleClosed(pts.map(pt=>[pt.x,pt.y]), p.angularSegments);
-  const xNorm=normalizeToRange(resampled.map(r=>r[0]),-p.axialTravel*0.5,p.axialTravel*0.5);
-  const rNorm=normalizeToRange(resampled.map(r=>r[1]),p.radiusMin,p.radiusMax);
-  const centers=[];
-  for(let i=0;i<resampled.length;i++){
-    const theta=2*Math.PI*i/resampled.length;
-    centers.push([xNorm[i], rNorm[i]*Math.cos(theta), rNorm[i]*Math.sin(theta)]);
+  // This diagnostic is intentionally conservative in the useful direction:
+  // it should flag "review this" rather than falsely declaring normal drawings impossible.
+  //
+  // The old version measured curvature of the full 3D wrapped helix centerline.
+  // That over-penalized perfectly plausible cams because even a smooth circular wrap
+  // has spatial curvature from going around the cylinder. Here we evaluate the groove
+  // in an *unwrapped* cam coordinate system:
+  //   u = theta * meanRadius      circumferential distance
+  //   x = axial center position
+  //   r = radial groove-center position
+  // and then use percentile statistics rather than one worst sample.
+  const N = p.angularSegments;
+  const resampled = resampleClosed(pts.map(pt=>[pt.x,pt.y]), N);
+
+  const xNorm = normalizeToRange(
+    resampled.map(r=>r[0]),
+    -p.axialTravel*0.5,
+     p.axialTravel*0.5
+  );
+  const rNorm = normalizeToRange(resampled.map(r=>r[1]), p.radiusMin, p.radiusMax);
+  const meanR = rNorm.reduce((a,b)=>a+b,0) / Math.max(rNorm.length,1);
+
+  const unwrapped = [];
+  for(let i=0;i<N;i++){
+    const theta = 2*Math.PI*i/N;
+    unwrapped.push([theta*meanR, xNorm[i], rNorm[i]]);
   }
 
-  // Light smoothing removes one-sample curvature noise from polygonal discretization.
-  const smoothCenters=centers.map((b,i)=>{
-    const a=centers[(i-1+centers.length)%centers.length];
-    const c=centers[(i+1)%centers.length];
+  // Light circular smoothing reduces false warnings from single-sample jitter.
+  const smooth = unwrapped.map((_,i)=>{
+    const a=unwrapped[(i-1+N)%N], b=unwrapped[i], c=unwrapped[(i+1)%N];
     return [
-      0.25*a[0]+0.5*b[0]+0.25*c[0],
-      0.25*a[1]+0.5*b[1]+0.25*c[1],
-      0.25*a[2]+0.5*b[2]+0.25*c[2],
+      0.25*a[0] + 0.50*b[0] + 0.25*c[0],
+      0.25*a[1] + 0.50*b[1] + 0.25*c[1],
+      0.25*a[2] + 0.50*b[2] + 0.25*c[2],
     ];
   });
 
-  let minRad=Infinity;
-  for(let i=0;i<smoothCenters.length;i++){
-    const a=smoothCenters[(i-1+smoothCenters.length)%smoothCenters.length];
-    const b=smoothCenters[i];
-    const c=smoothCenters[(i+1)%smoothCenters.length];
-    const ab=[b[0]-a[0],b[1]-a[1],b[2]-a[2]];
-    const bc=[c[0]-b[0],c[1]-b[1],c[2]-b[2]];
-    const ac=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
-    const lab=Math.hypot(...ab), lbc=Math.hypot(...bc), lac=Math.hypot(...ac);
-    const cross=[ab[1]*ac[2]-ab[2]*ac[1], ab[2]*ac[0]-ab[0]*ac[2], ab[0]*ac[1]-ab[1]*ac[0]];
-    const crossMag=Math.hypot(...cross);
-    if(crossMag < 1e-9 || lab<1e-9 || lbc<1e-9 || lac<1e-9) continue;
-    const curvature=(2*crossMag)/(lab*lbc*lac);
-    if(curvature>1e-9) minRad=Math.min(minRad,1/curvature);
+  function dist(a,b){
+    return Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2]);
   }
 
-  const gr=p.grooveRadius;
-  const ratio=minRad/gr;
-  let status='safe', note='Arc-length sampled groove turns are comfortably larger than the groove radius.';
-  if(!Number.isFinite(minRad)) {
-    status='caution';
-    note='Could not estimate a reliable bend radius from the arc-length-sampled groove.';
-  } else if(ratio < 1.35) {
-    status='risky';
-    note='Some arc-length-sampled bends are very tight relative to the groove radius; check this model before printing.';
-  } else if(ratio < 2.25) {
-    status='caution';
-    note='Some arc-length-sampled bends are moderately tight relative to the groove radius; likely inspect manually.';
+  const radii = [];
+  const turnAngles = [];
+  const slopes = [];
+
+  for(let i=0;i<N;i++){
+    const a=smooth[(i-1+N)%N];
+    const b=smooth[i];
+    const c=smooth[(i+1)%N];
+
+    const ab=[b[0]-a[0], b[1]-a[1], b[2]-a[2]];
+    const bc=[c[0]-b[0], c[1]-b[1], c[2]-b[2]];
+    const ac=[c[0]-a[0], c[1]-a[1], c[2]-a[2]];
+
+    const lab=Math.hypot(...ab), lbc=Math.hypot(...bc), lac=Math.hypot(...ac);
+    if(lab<1e-9 || lbc<1e-9 || lac<1e-9) continue;
+
+    const cross=[
+      ab[1]*ac[2]-ab[2]*ac[1],
+      ab[2]*ac[0]-ab[0]*ac[2],
+      ab[0]*ac[1]-ab[1]*ac[0]
+    ];
+    const crossMag=Math.hypot(...cross);
+    if(crossMag>1e-9){
+      // Circumradius of the local triangle.
+      radii.push((lab*lbc*lac)/(2*crossMag));
+    }
+
+    const dot=ab[0]*bc[0]+ab[1]*bc[1]+ab[2]*bc[2];
+    const cosTurn=Math.max(-1,Math.min(1,dot/(lab*lbc)));
+    turnAngles.push(Math.acos(cosTurn));
+
+    const du=Math.abs(c[0]-a[0]);
+    const dx=Math.abs(c[1]-a[1]);
+    const dr=Math.abs(c[2]-a[2]);
+    slopes.push(Math.hypot(dx,dr)/Math.max(du,1e-9));
   }
-  return { minBendRadius:minRad, ratio, status, note };
+
+  radii.sort((a,b)=>a-b);
+  turnAngles.sort((a,b)=>a-b);
+  slopes.sort((a,b)=>a-b);
+
+  function percentile(arr,q,fallback=Infinity){
+    if(!arr.length) return fallback;
+    const idx=Math.max(0,Math.min(arr.length-1,Math.floor(q*(arr.length-1))));
+    return arr[idx];
+  }
+
+  // Use the 5th percentile rather than the absolute minimum.
+  // This avoids one noisy local estimate dominating the verdict.
+  const minBendRadius = radii.length ? radii[0] : Infinity;
+  const robustBendRadius = percentile(radii,0.05,Infinity);
+  const ratio = robustBendRadius / p.grooveRadius;
+  const worstTurnDeg = percentile(turnAngles,0.95,0) * 180/Math.PI;
+  const slope95 = percentile(slopes,0.95,0);
+
+  let status='safe';
+  let note='Looks plausible. The reported score is a heuristic, not a hard manufacturing limit.';
+
+  // Much softer thresholds:
+  //   - tight < 2 groove radii: inspect closely
+  //   - review < 1.2 groove radii or very abrupt turn/slope
+  // We avoid saying "impossible" unless geometry construction itself fails elsewhere.
+  if(ratio < 1.2 || worstTurnDeg > 78 || slope95 > 1.85){
+    status='risky';
+    note='This has locally tight or abrupt motion. It may be possible, but it is likely better to reconsider.';
+  } else if(ratio < 2.0 || worstTurnDeg > 58 || slope95 > 1.25){
+    status='caution';
+    note='Probably possible, but some regions are tighter than ideal. Check the physical follower/groove clearance.';
+  }
+
+  return {
+    minBendRadius,
+    robustBendRadius,
+    ratio,
+    worstTurnDeg,
+    slope95,
+    status,
+    note
+  };
 }
 
 function rebuildThreeScene(){
@@ -2073,12 +2232,22 @@ function updateCamInfo(p, metrics){
   document.getElementById('infoball').textContent=ball.toFixed(2)+' mm';
   document.getElementById('infoslot').textContent=slot.toFixed(2)+' mm';
   document.getElementById('infolip').textContent=lip.toFixed(2)+' mm';
-  document.getElementById('infobend').textContent=Number.isFinite(metrics.minBendRadius) ? metrics.minBendRadius.toFixed(2)+' mm' : '—';
-  document.getElementById('inforatio').textContent=Number.isFinite(metrics.ratio) ? metrics.ratio.toFixed(2)+'×' : '—';
+
+  // Display the robust bend radius, not the single worst local sample.
+  document.getElementById('infobend').textContent=Number.isFinite(metrics.robustBendRadius)
+    ? metrics.robustBendRadius.toFixed(2)+' mm'
+    : '—';
+  document.getElementById('inforatio').textContent=Number.isFinite(metrics.ratio)
+    ? metrics.ratio.toFixed(2)+'×'
+    : '—';
+
   const badge=document.getElementById('infostatus');
   badge.textContent=metrics.status;
   badge.className='cam-badge '+metrics.status;
-  document.getElementById('manufactureNote').textContent=metrics.note + ' This uses groove radius as a proxy, not a final machinability proof.';
+  document.getElementById('manufactureNote').textContent=
+    metrics.note +
+    ` Robust bend/groove ratio: ${Number.isFinite(metrics.ratio) ? metrics.ratio.toFixed(2)+'×' : '—'}; ` +
+    `worst local turn: ${metrics.worstTurnDeg.toFixed(0)}°; slope score: ${metrics.slope95.toFixed(2)}.`;
 }
 
 function render3D(){
@@ -2165,12 +2334,12 @@ window.addEventListener('keydown', e => {
 // POINT COUNT
 // ═══════════════════════════════════════════════════════
 document.getElementById('btnPlus').addEventListener('click',()=>{
-  if(numPts>=12)return;
+  if(numPts>=15)return;
   numPts++;
   const l=nodes[nodes.length-1],f=nodes[0];
   nodes.push({x:(l.x+f.x)/2,y:(l.y+f.y)/2});
   document.getElementById('ptCount').textContent=numPts;
-  splineDirty=true; _splinePts=[]; camSystem=null; optimizedNodes=null; curveMode='original';
+  splineDirty=true; _splinePts=[]; invalidateAnimPathCache(); invalidateAnimPathCache(); camSystem=null; optimizedNodes=null; curveMode='original';
   document.getElementById('paramsPanel').style.display='none';
   document.getElementById('toolOptimize').disabled=false;
   scheduleCamPreviewRebuild();
@@ -2181,7 +2350,7 @@ document.getElementById('btnMinus').addEventListener('click',()=>{
   if(numPts<=3)return;
   numPts--; nodes.pop();
   document.getElementById('ptCount').textContent=numPts;
-  splineDirty=true; _splinePts=[]; camSystem=null; optimizedNodes=null; curveMode='original';
+  splineDirty=true; _splinePts=[]; invalidateAnimPathCache(); invalidateAnimPathCache(); camSystem=null; optimizedNodes=null; curveMode='original';
   document.getElementById('paramsPanel').style.display='none';
   document.getElementById('toolOptimize').disabled=false;
   scheduleCamPreviewRebuild();
