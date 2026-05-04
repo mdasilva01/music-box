@@ -541,8 +541,8 @@ body {
     <button class="tb-optimize" id="toolOptimize">optimize</button>
     <label class="tb-fit" title="Lower fit smooths more; higher fit stays closer to the original spline.">
       fit
-      <input type="range" id="fitSlider" min="0.30" max="1.50" step="0.05" value="1.00"/>
-      <span id="fitVal">1.00×</span>
+      <input type="range" id="fitSlider" min="0.30" max="5.00" step="0.05" value="2.50"/>
+      <span id="fitVal">2.50×</span>
     </label>
     <button class="tb-accept" id="acceptOpt" disabled>use optimized</button>
     <button class="tb-accept" id="rejectOpt" disabled>discard</button>
@@ -582,12 +582,10 @@ body {
         <button class="tool-btn" id="toolAnimate">▶ Animate Drawing</button>
         <div class="pts-label">trajectory speed</div>
         <div class="pts-slider-wrap">
-          <input type="range" id="speedSlider" min="0.01" max="5.00" step="0.02" value="0.20"/>
-          <span class="pts-val speed-readout" id="speedVal">1.0x</span>
+          <input type="range" id="speedSlider" min="0.01" max="5.00" step="0.01" value="2.50"/>
+          <span class="pts-val speed-readout" id="speedVal">2.50x</span>
         </div>
       </div>
-      <div class="prog-wrap"><div class="prog-bar" id="pb"></div></div>
-      <div class="status-txt" id="statusTxt">drag points · export the final cam</div>
     </div>
 
     <div class="panel">
@@ -613,7 +611,7 @@ body {
           <div class="cam-section-title">Adjustable</div>
           <div class="cam-param-row">
             <div class="cam-param-label">Lip cover <span class="cam-param-val" id="lbLip">0.7</span></div>
-            <input type="range" id="slLip" min="0.01" max="0.95" step="0.01" value="0.7"/>
+            <input type="range" id="slLip" min="0.85" max="0.97" step="0.005" value="0.9"/>
           </div>
         </div>
 
@@ -636,6 +634,7 @@ body {
           <div class="cam-info-row">Lip overhang <span class="cam-info-val" id="infolip">—</span></div>
           <div class="cam-info-row">Robust bend radius <span class="cam-info-val" id="infobend">—</span></div>
           <div class="cam-info-row">Bend/groove score <span class="cam-info-val" id="inforatio">—</span></div>
+          <div class="cam-info-row">Anti-stuck score <span class="cam-info-val" id="infojam">—</span></div>
           <div class="cam-info-row">Status <span class="cam-info-val" id="infostatusWrap"><span class="cam-badge" id="infostatus">—</span></span></div>
           <div class="cam-note" id="manufactureNote">Heuristic review score based on the unwrapped, arc-length-sampled groove.</div>
         </div>
@@ -878,52 +877,99 @@ function sampleTargetPts(N) {
 
 function optimizeCurve(opts) {
   // opts: { alpha (smooth), beta (fidelity), gamma (length), iterations }
+  //
+  // The follower-stuck term is intentionally tiny. It acts as a tie-breaker
+  // against sharp / binding-prone local turns, while fidelity remains dominant.
   const { alpha = 0.15, beta = 0.80, gamma = 0.05, iterations = 80 } = opts || {};
+  const jam = 0.045; // small fixed regularizer; do not let this drive the curve
 
-  // Start from current nodes
   let pts = nodes.map(n => ({ x: n.x, y: n.y }));
   const N = pts.length;
   if (N < 3) return pts;
 
-  // Reference: densely sample original spline (ground truth for fidelity)
-  const REF_N = 300;
-  const ref = [];
-  for (let i = 0; i < REF_N; i++) ref.push(evalSpline(i / REF_N));
+  const refNodes = nodes.map(n => ({ x: n.x, y: n.y }));
+  const norm2 = (x,y) => Math.max(Math.hypot(x,y), 1e-9);
+
+  // Hard safety rail: optimized control points may only move a modest distance
+  // from their original corresponding nodes. This prevents off-map blowups.
+  const bb = {
+    minX: Math.min(...refNodes.map(p=>p.x)),
+    maxX: Math.max(...refNodes.map(p=>p.x)),
+    minY: Math.min(...refNodes.map(p=>p.y)),
+    maxY: Math.max(...refNodes.map(p=>p.y))
+  };
+  const diag = Math.hypot(bb.maxX-bb.minX, bb.maxY-bb.minY);
+  const maxMove = Math.max(18, 0.075 * diag);
 
   for (let iter = 0; iter < iterations; iter++) {
-    const t = iter / iterations; // goes 0→1
+    const stepDecay = 1.0 - 0.65 * (iter / Math.max(iterations - 1, 1));
 
-    // Compute gradient descent step
-    const newPts = pts.map((p, i) => {
-      const prev = pts[(i - 1 + N) % N];
-      const next = pts[(i + 1) % N];
+    pts = pts.map((p, i) => {
+      const prev2 = pts[(i - 2 + N) % N];
+      const prev  = pts[(i - 1 + N) % N];
+      const next  = pts[(i + 1) % N];
+      const next2 = pts[(i + 2) % N];
 
-      // Laplacian (smoothness) force: pull toward midpoint of neighbors
-      const lapX = ((prev.x + next.x) / 2 - p.x);
-      const lapY = ((prev.y + next.y) / 2 - p.y);
+      // Smoothness: reduce local curvature.
+      const midX = 0.5 * (prev.x + next.x);
+      const midY = 0.5 * (prev.y + next.y);
+      const lapX = midX - p.x;
+      const lapY = midY - p.y;
 
-      // Length (shortening) force: pull toward midpoint of arc
-      const midX = (prev.x + next.x) / 2;
-      const midY = (prev.y + next.y) / 2;
-      const lenX = (midX - p.x) * 0.5;
-      const lenY = (midY - p.y) * 0.5;
+      // Length: discourage unnecessary wiggle length.
+      const lenX = 0.5 * lapX;
+      const lenY = 0.5 * lapY;
 
-      // Fidelity: find nearest reference point and pull toward it
-      // Sample spline at this node's parameter
-      const tParam = i / N;
-      const refIdx = Math.round(tParam * REF_N) % REF_N;
-      const refPt  = ref[refIdx];
-      const fidX = (refPt.x - p.x);
-      const fidY = (refPt.y - p.y);
+      // Fidelity: keep optimized curve near the user drawing.
+      // Slightly boosted so it dominates the small anti-stuck regularizer.
+      const fidX = refNodes[i].x - p.x;
+      const fidY = refNodes[i].y - p.y;
 
-      const stepSize = 0.35;
-      return {
-        x: p.x + stepSize * (alpha * lapX + gamma * lenX + beta * fidX),
-        y: p.y + stepSize * (alpha * lapY + gamma * lenY + beta * fidY)
-      };
+      // Tiny follower-stuck regularizer:
+      // Only activates for abrupt bends and sudden curvature jumps.
+      const v1x = p.x - prev.x, v1y = p.y - prev.y;
+      const v2x = next.x - p.x, v2y = next.y - p.y;
+      const turn = Math.acos(Math.max(-1, Math.min(1, (v1x*v2x + v1y*v2y) / (norm2(v1x,v1y)*norm2(v2x,v2y)))));
+
+      const a1x = prev.x - prev2.x, a1y = prev.y - prev2.y;
+      const a2x = p.x - prev.x,     a2y = p.y - prev.y;
+      const b1x = next.x - p.x,     b1y = next.y - p.y;
+      const b2x = next2.x - next.x, b2y = next2.y - next.y;
+
+      const turnPrev = Math.acos(Math.max(-1, Math.min(1, (a1x*a2x + a1y*a2y)/(norm2(a1x,a1y)*norm2(a2x,a2y)))));
+      const turnNext = Math.acos(Math.max(-1, Math.min(1, (b1x*b2x + b1y*b2y)/(norm2(b1x,b1y)*norm2(b2x,b2y)))));
+      const turnJump = Math.abs(turn - 0.5 * (turnPrev + turnNext));
+
+      // Higher thresholds so normal corners are not aggressively flattened.
+      const turnRisk = Math.max(0, turn - 0.75);
+      const jumpRisk = Math.max(0, turnJump - 0.40);
+      const stuckRisk = Math.min(2.0, turnRisk*turnRisk + 0.35*jumpRisk*jumpRisk);
+
+      const fairX = (prev2.x + 2*prev.x + 2*next.x + next2.x) / 6;
+      const fairY = (prev2.y + 2*prev.y + 2*next.y + next2.y) / 6;
+      const stuckX = (fairX - p.x) * stuckRisk;
+      const stuckY = (fairY - p.y) * stuckRisk;
+
+      // Smaller step prevents overshoot.
+      const step = 0.18 * stepDecay;
+      let nx = p.x + step * (alpha*lapX + gamma*lenX + (beta*1.35)*fidX + jam*stuckX);
+      let ny = p.y + step * (alpha*lapY + gamma*lenY + (beta*1.35)*fidY + jam*stuckY);
+
+      // Clamp relative to original node.
+      const dx = nx - refNodes[i].x;
+      const dy = ny - refNodes[i].y;
+      const d = Math.hypot(dx, dy);
+      if (d > maxMove) {
+        nx = refNodes[i].x + dx / d * maxMove;
+        ny = refNodes[i].y + dy / d * maxMove;
+      }
+
+      // Clamp to canvas bounds as a final guardrail.
+      nx = Math.max(20, Math.min(W - 20, nx));
+      ny = Math.max(20, Math.min(H - 20, ny));
+
+      return { x: nx, y: ny };
     });
-
-    pts = newPts;
   }
 
   return pts;
@@ -1375,10 +1421,10 @@ speedSlider.addEventListener('input',()=>{ animSpeed=parseFloat(speedSlider.valu
 
 const fitSlider = document.getElementById('fitSlider');
 function updateFitLabel(){ document.getElementById('fitVal').textContent=parseFloat(fitSlider.value).toFixed(2)+'×'; }
-fitSlider.addEventListener('input',()=>{ updateFitLabel(); if(optimizedNodes) runOptimize(); });
+fitSlider.addEventListener('input',()=>{ updateFitLabel(); if(optimizedNodes) runOptimize({silent:true}); });
 
-function setStatus(m){ document.getElementById('statusTxt').textContent=m; }
-function setProgress(p){ document.getElementById('pb').style.width=p+'%'; }
+function setStatus(m){}
+function setProgress(p){}
 
 // ═══════════════════════════════════════════════════════
 // LIVE CAM REBUILD
@@ -1408,11 +1454,16 @@ function scheduleCamSystemRebuild(showStatus=false) {
 // ═══════════════════════════════════════════════════════
 // OPTIMIZE CURVE
 // ═══════════════════════════════════════════════════════
-async function runOptimize() {
+async function runOptimize(opts) {
+  opts = opts || {};
+  const silent = !!opts.silent;
   const btn=document.getElementById('toolOptimize');
   const fitMult=parseFloat(document.getElementById('fitSlider').value);
-  btn.textContent='optimizing…'; btn.classList.add('running');
-  setStatus(`optimizing curve · fit ${fitMult.toFixed(2)}×`); setProgress(0);
+
+  // Keep the button text stable. During silent slider updates, don't visually pulse either.
+  if(!silent) btn.classList.add('running');
+  setStatus(`optimizing curve · fit ${fitMult.toFixed(2)}× · small anti-stuck loss included`);
+  setProgress(0);
   await tick(); setProgress(20);
 
   await new Promise(resolve => {
@@ -1424,7 +1475,7 @@ async function runOptimize() {
           alpha: 0.25 * smoothBoost,
           beta: 0.70 * fitMult,
           gamma: 0.05 * smoothBoost,
-          iterations: 140
+          iterations: 120
         });
         setProgress(85);
       } catch(e) {
@@ -1447,6 +1498,8 @@ async function runOptimize() {
     setStatus('optimization failed');
   }
   updateCurveToggleUI();
+
+  // Never set the visible label to "optimizing…"; keep it as the action name.
   btn.textContent='optimize';
   btn.classList.remove('running');
   draw();
@@ -1684,7 +1737,7 @@ document.getElementById('toolReset').addEventListener('click',()=>{
   document.getElementById('toolOptimize').classList.remove('opt-active');
   pushHistory(); rebuildGeneratedCam(false); scheduleCamPreviewRebuild(); draw();
 });
-document.getElementById('toolOptimize').addEventListener('click',runOptimize);
+document.getElementById('toolOptimize').addEventListener('click',()=>runOptimize({silent:false}));
 document.getElementById('acceptOpt').addEventListener('click',acceptOptimizedCurve);
 document.getElementById('rejectOpt').addEventListener('click',rejectOptimizedCurve);
 document.getElementById('toolAnimate').addEventListener('click',()=>animating?stopAnim():startAnim());
@@ -2075,26 +2128,54 @@ function buildThreeMesh(verts,faces,mat){
   return new THREE.Mesh(geo,mat);
 }
 
+
+function computeAntiStuckScoreFromSamples(samples){
+  const N = samples.length;
+  if(N < 6) return { score:0, turn95:0, jump95:0, segCv:0 };
+
+  const turns = [];
+  const jumps = [];
+  const segs = [];
+  const sub = (a,b) => [a[0]-b[0], a[1]-b[1], (a[2]||0)-(b[2]||0)];
+  const dot = (a,b) => a[0]*b[0] + a[1]*b[1] + (a[2]||0)*(b[2]||0);
+  const norm = v => Math.max(Math.hypot(v[0],v[1],v[2]||0),1e-9);
+
+  for(let i=0;i<N;i++){
+    const v1=sub(samples[i], samples[(i-1+N)%N]);
+    const v2=sub(samples[(i+1)%N], samples[i]);
+    const l2=norm(v2);
+    segs.push(l2);
+    turns.push(Math.acos(Math.max(-1,Math.min(1,dot(v1,v2)/(norm(v1)*l2)))));
+  }
+
+  for(let i=0;i<N;i++){
+    jumps.push(Math.abs(turns[i] - 0.5*(turns[(i-1+N)%N] + turns[(i+1)%N])));
+  }
+
+  turns.sort((a,b)=>a-b);
+  jumps.sort((a,b)=>a-b);
+
+  const meanSeg = segs.reduce((a,b)=>a+b,0)/Math.max(segs.length,1);
+  const varSeg = segs.reduce((a,b)=>a+(b-meanSeg)*(b-meanSeg),0)/Math.max(segs.length,1);
+  const segCv = Math.sqrt(varSeg)/Math.max(meanSeg,1e-9);
+
+  const pctl = (arr,q) => arr.length ? arr[Math.max(0,Math.min(arr.length-1,Math.floor(q*(arr.length-1))))] : 0;
+  const turn95 = pctl(turns,0.95);
+  const jump95 = pctl(jumps,0.95);
+
+  const score =
+    0.80 * (turn95 / 0.75) +
+    0.55 * (jump95 / 0.45) +
+    0.35 * Math.min(segCv / 0.25, 2.0);
+
+  return { score, turn95, jump95, segCv };
+}
+
 function computeCamCenterlineMetrics(pts,p){
-  // This diagnostic is intentionally conservative in the useful direction:
-  // it should flag "review this" rather than falsely declaring normal drawings impossible.
-  //
-  // The old version measured curvature of the full 3D wrapped helix centerline.
-  // That over-penalized perfectly plausible cams because even a smooth circular wrap
-  // has spatial curvature from going around the cylinder. Here we evaluate the groove
-  // in an *unwrapped* cam coordinate system:
-  //   u = theta * meanRadius      circumferential distance
-  //   x = axial center position
-  //   r = radial groove-center position
-  // and then use percentile statistics rather than one worst sample.
   const N = p.angularSegments;
   const resampled = resampleClosed(pts.map(pt=>[pt.x,pt.y]), N);
 
-  const xNorm = normalizeToRange(
-    resampled.map(r=>r[0]),
-    -p.axialTravel*0.5,
-     p.axialTravel*0.5
-  );
+  const xNorm = normalizeToRange(resampled.map(r=>r[0]), -p.axialTravel*0.5, p.axialTravel*0.5);
   const rNorm = normalizeToRange(resampled.map(r=>r[1]), p.radiusMin, p.radiusMax);
   const meanR = rNorm.reduce((a,b)=>a+b,0) / Math.max(rNorm.length,1);
 
@@ -2104,7 +2185,6 @@ function computeCamCenterlineMetrics(pts,p){
     unwrapped.push([theta*meanR, xNorm[i], rNorm[i]]);
   }
 
-  // Light circular smoothing reduces false warnings from single-sample jitter.
   const smooth = unwrapped.map((_,i)=>{
     const a=unwrapped[(i-1+N)%N], b=unwrapped[i], c=unwrapped[(i+1)%N];
     return [
@@ -2113,10 +2193,6 @@ function computeCamCenterlineMetrics(pts,p){
       0.25*a[2] + 0.50*b[2] + 0.25*c[2],
     ];
   });
-
-  function dist(a,b){
-    return Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2]);
-  }
 
   const radii = [];
   const turnAngles = [];
@@ -2127,9 +2203,9 @@ function computeCamCenterlineMetrics(pts,p){
     const b=smooth[i];
     const c=smooth[(i+1)%N];
 
-    const ab=[b[0]-a[0], b[1]-a[1], b[2]-a[2]];
-    const bc=[c[0]-b[0], c[1]-b[1], c[2]-b[2]];
-    const ac=[c[0]-a[0], c[1]-a[1], c[2]-a[2]];
+    const ab=[b[0]-a[0],b[1]-a[1],b[2]-a[2]];
+    const bc=[c[0]-b[0],c[1]-b[1],c[2]-b[2]];
+    const ac=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
 
     const lab=Math.hypot(...ab), lbc=Math.hypot(...bc), lac=Math.hypot(...ac);
     if(lab<1e-9 || lbc<1e-9 || lac<1e-9) continue;
@@ -2140,10 +2216,7 @@ function computeCamCenterlineMetrics(pts,p){
       ab[0]*ac[1]-ab[1]*ac[0]
     ];
     const crossMag=Math.hypot(...cross);
-    if(crossMag>1e-9){
-      // Circumradius of the local triangle.
-      radii.push((lab*lbc*lac)/(2*crossMag));
-    }
+    if(crossMag>1e-9) radii.push((lab*lbc*lac)/(2*crossMag));
 
     const dot=ab[0]*bc[0]+ab[1]*bc[1]+ab[2]*bc[2];
     const cosTurn=Math.max(-1,Math.min(1,dot/(lab*lbc)));
@@ -2158,34 +2231,28 @@ function computeCamCenterlineMetrics(pts,p){
   radii.sort((a,b)=>a-b);
   turnAngles.sort((a,b)=>a-b);
   slopes.sort((a,b)=>a-b);
-
-  function percentile(arr,q,fallback=Infinity){
+  const percentile = (arr,q,fallback=Infinity) => {
     if(!arr.length) return fallback;
     const idx=Math.max(0,Math.min(arr.length-1,Math.floor(q*(arr.length-1))));
     return arr[idx];
-  }
+  };
 
-  // Use the 5th percentile rather than the absolute minimum.
-  // This avoids one noisy local estimate dominating the verdict.
   const minBendRadius = radii.length ? radii[0] : Infinity;
   const robustBendRadius = percentile(radii,0.05,Infinity);
   const ratio = robustBendRadius / p.grooveRadius;
   const worstTurnDeg = percentile(turnAngles,0.95,0) * 180/Math.PI;
   const slope95 = percentile(slopes,0.95,0);
+  const antiStuck = computeAntiStuckScoreFromSamples(smooth);
 
   let status='safe';
-  let note='Looks plausible. The reported score is a heuristic, not a hard manufacturing limit.';
+  let note='Looks plausible. The score is a heuristic, not a hard manufacturing limit.';
 
-  // Much softer thresholds:
-  //   - tight < 2 groove radii: inspect closely
-  //   - review < 1.2 groove radii or very abrupt turn/slope
-  // We avoid saying "impossible" unless geometry construction itself fails elsewhere.
-  if(ratio < 1.2 || worstTurnDeg > 78 || slope95 > 1.85){
+  if(ratio < 1.2 || worstTurnDeg > 78 || slope95 > 1.85 || antiStuck.score > 1.35){
     status='risky';
-    note='This has locally tight or abrupt motion. It may be possible, but it is likely better to reconsider.';
-  } else if(ratio < 2.0 || worstTurnDeg > 58 || slope95 > 1.25){
+    note='This has locally abrupt motion where a follower could bind. It may still be possible, but it deserves manual review.';
+  } else if(ratio < 2.0 || worstTurnDeg > 58 || slope95 > 1.25 || antiStuck.score > 0.95){
     status='caution';
-    note='Probably possible, but some regions are tighter than ideal. Check the physical follower/groove clearance.';
+    note='Probably possible, but some regions may increase follower sticking risk. Check follower clearance and groove finish.';
   }
 
   return {
@@ -2194,6 +2261,10 @@ function computeCamCenterlineMetrics(pts,p){
     ratio,
     worstTurnDeg,
     slope95,
+    antiStuckScore: antiStuck.score,
+    antiStuckTurn95: antiStuck.turn95,
+    antiStuckJump95: antiStuck.jump95,
+    antiStuckSegCv: antiStuck.segCv,
     status,
     note
   };
@@ -2233,7 +2304,6 @@ function updateCamInfo(p, metrics){
   document.getElementById('infoslot').textContent=slot.toFixed(2)+' mm';
   document.getElementById('infolip').textContent=lip.toFixed(2)+' mm';
 
-  // Display the robust bend radius, not the single worst local sample.
   document.getElementById('infobend').textContent=Number.isFinite(metrics.robustBendRadius)
     ? metrics.robustBendRadius.toFixed(2)+' mm'
     : '—';
@@ -2241,13 +2311,19 @@ function updateCamInfo(p, metrics){
     ? metrics.ratio.toFixed(2)+'×'
     : '—';
 
+  const jamEl=document.getElementById('infojam');
+  if(jamEl) jamEl.textContent=Number.isFinite(metrics.antiStuckScore)
+    ? metrics.antiStuckScore.toFixed(2)
+    : '—';
+
   const badge=document.getElementById('infostatus');
   badge.textContent=metrics.status;
   badge.className='cam-badge '+metrics.status;
   document.getElementById('manufactureNote').textContent=
     metrics.note +
-    ` Robust bend/groove ratio: ${Number.isFinite(metrics.ratio) ? metrics.ratio.toFixed(2)+'×' : '—'}; ` +
-    `worst local turn: ${metrics.worstTurnDeg.toFixed(0)}°; slope score: ${metrics.slope95.toFixed(2)}.`;
+    ` Anti-stuck score: ${Number.isFinite(metrics.antiStuckScore) ? metrics.antiStuckScore.toFixed(2) : '—'}; ` +
+    `robust bend/groove: ${Number.isFinite(metrics.ratio) ? metrics.ratio.toFixed(2)+'×' : '—'}; ` +
+    `worst local turn: ${metrics.worstTurnDeg.toFixed(0)}°.`;
 }
 
 function render3D(){
