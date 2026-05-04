@@ -1,0 +1,17 @@
+Directions for Constructing Your Drawing Machine
+
+1. 3D print all of the pieces in the original dimension or 
+   rescale everything (including the cam) as one.
+
+2. Once printed and supports are removed, slip the slider 
+   mechanism and stand into place on the side opposite the 
+   cam-holder.
+
+3. Lock the cam into place. The follower has a flat face that 
+   can fit in the groove and be turned to prevent it from exiting.
+
+4. Place the follower in the slider mechanism and attach the pen 
+   holder on the other side. Put your desired writing utensil in 
+   the slot.
+
+5. Place a piece of paper on the stand to obtain your drawing!

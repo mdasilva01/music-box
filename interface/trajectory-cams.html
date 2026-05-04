@@ -527,6 +527,54 @@ body {
 }
 .curve-toggle-btn.on { background: var(--navy); color: #fff; }
 .curve-toggle-btn.on.opt { background: var(--optimized); }
+
+
+/* ─── Mechanism explanation panel ─── */
+.mechanism-panel {
+  position: absolute;
+  left: 22px;
+  bottom: 18px;
+  width: 392px;
+  max-height: calc(100vh - 420px);
+  min-height: 260px;
+  overflow-y: auto;
+  pointer-events: auto;
+  scrollbar-width: none;
+}
+.mechanism-panel::-webkit-scrollbar { display: none; }
+.mechanism-copy {
+  font-size: 9.5px;
+  color: #4a5a7a;
+  line-height: 1.5;
+  margin-bottom: 9px;
+}
+.mech-media-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  align-items: stretch;
+}
+.mech-video {
+  width: 100%;
+  height: 214px;
+  object-fit: cover;
+  display: block;
+  border-radius: 10px;
+  border: 1px solid rgba(44,49,112,0.16);
+  background: rgba(255,255,255,0.45);
+}
+#mechanismCanvas {
+  width: 100%;
+  height: 214px;
+  display: block;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.72);
+  border: 1px solid rgba(44,49,112,0.16);
+}
+@media (max-width: 980px) {
+  .mechanism-panel { display: none; }
+}
+
 </style>
 </head>
 <body>
@@ -579,6 +627,7 @@ body {
           </div>
         </div>
         <button class="tool-btn" id="downloadSTL">⬇ Export Full 3D Cam STL</button>
+        <button class="tool-btn" id="downloadCrankParts">⬇ Download Crank Parts ZIP</button>
         <button class="tool-btn" id="toolAnimate">▶ Animate Drawing</button>
         <div class="pts-label">trajectory speed</div>
         <div class="pts-slider-wrap">
@@ -644,6 +693,20 @@ body {
     </div>
 
     
+  </div>
+
+  <div class="panel mechanism-panel" id="mechanismPanel">
+    <h2 style="font-size:.95rem;margin-bottom:7px">How It Works</h2>
+    <p class="mechanism-copy">
+      The cam turns and pushes the follower in and out. The follower display grows and shrinks to show side-to-side motion. Together, those motions trace the path below.
+    </p>
+    <div class="mech-media-grid">
+      <video class="mech-video" controls autoplay loop muted playsinline preload="metadata">
+        <source src="mechanism-demo.mp4" type="video/mp4"/>
+        Your browser does not support the video tag.
+      </video>
+      <canvas id="mechanismCanvas" width="360" height="260"></canvas>
+    </div>
   </div>
 </div>
 
@@ -715,7 +778,7 @@ let animFrame = null;
 let splineDirty = true;
 let _splineData = null;
 let _splinePts  = [];
-let animSpeed = 0.2;
+let animSpeed = 2.5;
 const selectedEmoji = '✏️';
 
 // Optimized curve state
@@ -1205,9 +1268,6 @@ function draw() {
   if (animating) drawAnimDots();
 }
 
-function drawGrid() {
-}
-
 function drawTargetSpline(alpha) {
   if (splineDirty) { _splinePts = []; computeSplineData(); }
   const pts = getCachedSplinePts(90);
@@ -1250,9 +1310,6 @@ function drawOptimizedSpline(alpha) {
   pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
   ctx.closePath(); ctx.stroke();
   ctx.restore();
-}
-
-function drawCamReproducedPath() {
 }
 
 function drawMiniPathPanel(x, y, w, h, pts, currentPt) {
@@ -1335,9 +1392,6 @@ function drawCamSubpanel(x, y, w, h, radii, thetaNow, color, label) {
   ctx.font='10px DM Mono,monospace';
   ctx.fillText(label,x+4,y+h+13);
   ctx.restore();
-}
-
-function drawCamPreview() {
 }
 
 function roundRect(c,x,y,w,h,r){
@@ -2067,6 +2121,14 @@ function downloadBarrelSTL(){
 }
 
 document.getElementById('downloadSTL').addEventListener('click',downloadBarrelSTL);
+document.getElementById('downloadCrankParts').addEventListener('click',()=>{
+  const a = document.createElement('a');
+  a.href = '../crank-parts.zip';
+  a.download = 'crank-parts.zip';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+});
 
 // ═══════════════════════════════════════════════════════
 // EMBEDDED THREE.JS WEBGL PREVIEW
@@ -2439,19 +2501,282 @@ document.getElementById('btnMinus').addEventListener('click',()=>{
 // ═══════════════════════════════════════════════════════
 function tick(){ return new Promise(r=>setTimeout(r,0)); }
 
+
+
+// ═══════════════════════════════════════════════════════
+// MECHANISM EXPLANATION CANVAS
+// A compact explanatory model. The cam profile is derived from the same
+// active trajectory used by the preview/export pipeline, and the follower
+// is drawn as a small hemispherical contact normal to the cam surface.
+// ═══════════════════════════════════════════════════════
+let mechanismTheta = 0;
+let mechanismTrace = [];
+let mechanismLastKey = '';
+let mechanismSourceCache = null;
+
+function resizeMechanismCanvas() {
+  const mech = document.getElementById('mechanismCanvas');
+  if (!mech) return;
+  const rect = mech.getBoundingClientRect();
+  const scale = window.devicePixelRatio || 1;
+  const cssW = Math.max(160, rect.width || 190);
+  const cssH = Math.max(180, rect.height || 214);
+  mech.width = Math.round(cssW * scale);
+  mech.height = Math.round(cssH * scale);
+  mech.getContext('2d').setTransform(scale, 0, 0, scale, 0, 0);
+}
+
+function getMechanismPathPoints(count) {
+  try {
+    if (optimizedNodes && curveMode !== 'original') return sampleOptimizedSourcePts(count);
+    return sampleTargetPts(count);
+  } catch (err) {
+    const pts = [];
+    for (let i = 0; i < count; i++) {
+      const t = (i / count) * Math.PI * 2;
+      pts.push({ x: Math.cos(t) * 80, y: Math.sin(t) * 50 });
+    }
+    return pts;
+  }
+}
+
+function scalePathToBox(pts, x, y, w, h, pad) {
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const sc = Math.min(
+    (w - 2 * pad) / Math.max(maxX - minX, 1e-9),
+    (h - 2 * pad) / Math.max(maxY - minY, 1e-9)
+  );
+  const ox = x + (w - (maxX - minX) * sc) / 2 - minX * sc;
+  const oy = y + (h - (maxY - minY) * sc) / 2 - minY * sc;
+  return pts.map(p => ({ x: p.x * sc + ox, y: p.y * sc + oy }));
+}
+
+function drawMechanismRoundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x+r, y); c.lineTo(x+w-r, y);
+  c.quadraticCurveTo(x+w, y, x+w, y+r);
+  c.lineTo(x+w, y+h-r);
+  c.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  c.lineTo(x+r, y+h);
+  c.quadraticCurveTo(x, y+h, x, y+h-r);
+  c.lineTo(x, y+r);
+  c.quadraticCurveTo(x, y, x+r, y);
+  c.closePath();
+}
+
+function getMechanismCamProfile(count) {
+  const sys = buildCamSystem(count);
+  const fallback = new Array(count).fill(0).map((_, i) => {
+    const a = (i / count) * Math.PI * 2;
+    return 1 + 0.16 * Math.sin(2 * a + 0.7) + 0.08 * Math.cos(3 * a - 0.4);
+  });
+  if (!sys || !sys.camY || sys.camY.length < 8) return fallback;
+
+  const radii = sys.camY;
+  const lo = Math.min(...radii);
+  const hi = Math.max(...radii);
+  const span = Math.max(hi - lo, 1e-9);
+  return radii.map(r => 0.82 + 0.36 * ((r - lo) / span));
+}
+
+function polarProfilePoint(profile, i, cx, cy, scale, theta) {
+  const n = profile.length;
+  const a = (i / n) * Math.PI * 2 + theta;
+  const r = scale * profile[i];
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a), a, r };
+}
+
+function getMechanismXScale(rawPts, theta) {
+  if (!rawPts || rawPts.length < 2) return 1;
+  const xs = rawPts.map(p => p.x);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const span = Math.max(maxX - minX, 1e-9);
+  const idx = Math.floor((((theta / (Math.PI * 2)) % 1 + 1) % 1) * rawPts.length) % rawPts.length;
+  const xNorm = (rawPts[idx].x - minX) / span;
+  return 0.78 + 0.44 * xNorm;
+}
+
+function drawSurfaceNormalFollower(c, profile, cx, cy, scale, theta, followerScale) {
+  const n = profile.length;
+  const contactIdx = Math.floor((((-theta - Math.PI / 2) / (Math.PI * 2)) % 1 + 1) * n) % n;
+  const p0 = polarProfilePoint(profile, contactIdx, cx, cy, scale, theta);
+  const pm = polarProfilePoint(profile, (contactIdx - 2 + n) % n, cx, cy, scale, theta);
+  const pp = polarProfilePoint(profile, (contactIdx + 2) % n, cx, cy, scale, theta);
+
+  const tx = pp.x - pm.x;
+  const ty = pp.y - pm.y;
+  let nx = -ty;
+  let ny = tx;
+  const radialX = p0.x - cx;
+  const radialY = p0.y - cy;
+  if (nx * radialX + ny * radialY < 0) { nx = -nx; ny = -ny; }
+  const len = Math.max(Math.hypot(nx, ny), 1e-9);
+  nx /= len; ny /= len;
+
+  const rodWidth = 3.4;
+  const capR = rodWidth * 0.85;
+  const rodLen = 30 + 34 * (followerScale || 1);
+  const capCx = p0.x + nx * capR;
+  const capCy = p0.y + ny * capR;
+  const rodEndX = capCx + nx * rodLen;
+  const rodEndY = capCy + ny * rodLen;
+  const normalAngle = Math.atan2(ny, nx);
+
+  c.save();
+  c.strokeStyle = 'rgba(44,49,112,0.48)';
+  c.lineWidth = rodWidth;
+  c.lineCap = 'round';
+  c.beginPath();
+  c.moveTo(capCx, capCy);
+  c.lineTo(rodEndX, rodEndY);
+  c.stroke();
+  c.restore();
+
+  // Clean hemispherical cap: curved side touches the cam, flat side faces the rod.
+  c.save();
+  c.translate(capCx, capCy);
+  c.rotate(normalAngle);
+  c.beginPath();
+  c.arc(0, 0, capR, Math.PI / 2, Math.PI * 1.5, false);
+  c.closePath();
+  c.fillStyle = '#fff';
+  c.fill();
+  c.strokeStyle = '#2d3170';
+  c.lineWidth = 1.25;
+  c.stroke();
+  c.restore();
+
+  return p0;
+}
+
+function drawMechanismCanvas() {
+  const mech = document.getElementById('mechanismCanvas');
+  if (!mech) return;
+  const c = mech.getContext('2d');
+  const rect = mech.getBoundingClientRect();
+  const w = rect.width || 190;
+  const h = rect.height || 214;
+  c.clearRect(0, 0, w, h);
+
+  const key = getActiveCurveKey();
+  if (key !== mechanismLastKey || !mechanismSourceCache) {
+    mechanismLastKey = key;
+    mechanismTrace = [];
+    const rawPts = getMechanismPathPoints(360);
+    mechanismSourceCache = {
+      rawPts,
+      profile: getMechanismCamProfile(220)
+    };
+  }
+
+  c.save();
+  c.fillStyle = 'rgba(26,31,78,0.9)';
+  c.font = '9px Orbitron, Space Mono, monospace';
+  c.fillText('cam + follower', 11, 17);
+  c.fillText('output path', 11, h * 0.54);
+  c.restore();
+
+  const profile = mechanismSourceCache.profile;
+  const rawPts = mechanismSourceCache.rawPts;
+  const camCx = w * 0.48;
+  const camCy = h * 0.29;
+  const followerMotionScale = getMechanismXScale(rawPts, mechanismTheta);
+  const camScale = Math.min(w, h) * 0.20;
+
+  c.save();
+  c.beginPath();
+  for (let i = 0; i <= profile.length; i++) {
+    const p = polarProfilePoint(profile, i % profile.length, camCx, camCy, camScale, mechanismTheta);
+    i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y);
+  }
+  c.closePath();
+  c.fillStyle = 'rgba(223,231,245,0.96)';
+  c.fill();
+  c.strokeStyle = '#2d3170';
+  c.lineWidth = 2.1;
+  c.stroke();
+
+  c.beginPath();
+  c.moveTo(camCx, camCy);
+  c.lineTo(camCx + camScale * 0.84 * Math.cos(mechanismTheta), camCy + camScale * 0.84 * Math.sin(mechanismTheta));
+  c.strokeStyle = '#c45c2a';
+  c.lineWidth = 3;
+  c.stroke();
+  c.beginPath();
+  c.arc(camCx, camCy, 3.2, 0, Math.PI * 2);
+  c.fillStyle = '#2d3170';
+  c.fill();
+  c.restore();
+
+  drawSurfaceNormalFollower(c, profile, camCx, camCy, camScale, mechanismTheta, followerMotionScale);
+
+  const boxX = 12;
+  const boxY = h * 0.58;
+  const boxW = w - 24;
+  const boxH = h * 0.36;
+
+  c.save();
+  drawMechanismRoundRect(c, boxX, boxY, boxW, boxH, 11);
+  c.fillStyle = 'rgba(255,255,255,0.82)';
+  c.fill();
+  c.strokeStyle = 'rgba(44,49,112,0.14)';
+  c.lineWidth = 1.3;
+  c.stroke();
+  c.restore();
+
+  const pathPts = scalePathToBox(rawPts, boxX, boxY, boxW, boxH, 11);
+  const idx = Math.floor(((mechanismTheta / (Math.PI * 2)) % 1) * pathPts.length + pathPts.length) % pathPts.length;
+  const p = pathPts[idx];
+
+  mechanismTrace.push(p);
+  if (mechanismTrace.length > pathPts.length) mechanismTrace.shift();
+
+  c.save();
+  c.strokeStyle = 'rgba(44,49,112,0.18)';
+  c.lineWidth = 1;
+  c.beginPath();
+  pathPts.forEach((pt, i) => i ? c.lineTo(pt.x, pt.y) : c.moveTo(pt.x, pt.y));
+  c.closePath();
+  c.stroke();
+
+  if (mechanismTrace.length > 1) {
+    c.strokeStyle = '#c45c2a';
+    c.lineWidth = 2.2;
+    c.beginPath();
+    mechanismTrace.forEach((pt, i) => i ? c.lineTo(pt.x, pt.y) : c.moveTo(pt.x, pt.y));
+    c.stroke();
+  }
+
+  c.beginPath();
+  c.arc(p.x, p.y, 4.8, 0, Math.PI * 2);
+  c.fillStyle = '#7c3aed';
+  c.fill();
+  c.strokeStyle = '#fff';
+  c.lineWidth = 1.4;
+  c.stroke();
+  c.restore();
+
+  mechanismTheta += 0.018;
+  requestAnimationFrame(drawMechanismCanvas);
+}
+
 // ═══════════════════════════════════════════════════════
 // RESIZE + INIT
 // ═══════════════════════════════════════════════════════
 window.addEventListener('resize',()=>{
-  setupCanvas(); resetNodes(); camSystem=null;
+  setupCanvas(); resizeMechanismCanvas(); resetNodes(); camSystem=null;
   document.getElementById('paramsPanel').style.display='none';
   document.getElementById('toolOptimize').disabled=false;
   pushHistory(); rebuildGeneratedCam(false); scheduleCamPreviewRebuild(); draw();
 });
 
 (function init(){
-  setupCanvas(); resetNodes(); pushHistory(); updateSpeedLabel(); updateFitLabel();
+  setupCanvas(); resizeMechanismCanvas(); resetNodes(); pushHistory(); updateSpeedLabel(); updateFitLabel();
   updateCurveToggleUI(); rebuildGeneratedCam(false); scheduleCamPreviewRebuild(); draw();
+  drawMechanismCanvas();
 })();
 </script>
 </body>
